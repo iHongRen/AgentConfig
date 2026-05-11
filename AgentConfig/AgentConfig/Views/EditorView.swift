@@ -37,13 +37,17 @@ final class LineNumberRulerView: NSRulerView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        guard let textView = textView,
-              let layoutManager = textView.layoutManager,
-              let textContainer = textView.textContainer else { return }
+        // 用 NSGraphicsContext 保存状态，并严格 clip 到自身 bounds，
+        // 防止任何绘制溢出到 textView 区域
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+
+        // clip 到 ruler 自身的 bounds，绝对不会溢出
+        NSBezierPath(rect: bounds).setClip()
 
         // 背景
         NSColor(white: 0.96, alpha: 1.0).setFill()
-        dirtyRect.fill()
+        bounds.fill()
 
         // 右侧分隔线
         NSColor.separatorColor.setStroke()
@@ -52,6 +56,14 @@ final class LineNumberRulerView: NSRulerView {
         line.line(to: NSPoint(x: bounds.maxX - 0.5, y: dirtyRect.maxY))
         line.lineWidth = 0.5
         line.stroke()
+
+        drawLineNumbers()
+    }
+
+    private func drawLineNumbers() {
+        guard let textView = textView,
+              let layoutManager = textView.layoutManager,
+              let textContainer = textView.textContainer else { return }
 
         let visibleRect = scrollView?.contentView.bounds ?? bounds
         let containerOrigin = textView.textContainerOrigin
@@ -65,7 +77,6 @@ final class LineNumberRulerView: NSRulerView {
         var lineNumber = 1
         var charIndex = 0
 
-        // 强制 layout manager 完成布局
         layoutManager.ensureLayout(for: textContainer)
 
         while charIndex <= totalLength {
@@ -97,7 +108,6 @@ final class LineNumberRulerView: NSRulerView {
                 label.draw(in: drawRect, withAttributes: attrs)
             }
 
-            // 找下一行起始字符
             if charIndex >= totalLength { break }
             let nsRange = NSRange(location: charIndex, length: totalLength - charIndex)
             let newlineRange = fullText.range(of: "\n", range: nsRange)
@@ -196,40 +206,39 @@ struct CodeEditorView: NSViewRepresentable {
         // 6. Delegate
         tv.delegate = context.coordinator
 
-        // 7. 语法高亮 — 必须在 textStorage 上设置 delegate，且在 string 赋值之前
+        // 7. 装入 scrollView（必须在设置 textStorage.delegate 之前）
+        scrollView.documentView = tv
+
+        // 8. 语法高亮 — 在 documentView 设置之后再设置 delegate
         let highlighter = SyntaxHighlighter(fileType: fileType, isDarkMode: isDarkMode)
         tv.textStorage?.delegate = highlighter
 
-        // 8. 行号 ruler
+        // 9. 行号 ruler
         let ruler = LineNumberRulerView(scrollView: scrollView, textView: tv)
         scrollView.verticalRulerView = ruler
         scrollView.hasVerticalRuler = true
         scrollView.rulersVisible = true
 
-        // 9. 装入 scrollView
-        scrollView.documentView = tv
-
-        // 10. 设置内容
-        // 使用 replaceCharacters 而非 tv.string= ，避免断开 textStorage.delegate
-        let typingAttrs: [NSAttributedString.Key: Any] = [
+        // 10. 设置初始内容
+        // 直接用 tv.string 设置，简单可靠
+        tv.string = text
+        
+        // tv.string= 可能会替换 textStorage 对象，导致 delegate 丢失，重新设置
+        tv.textStorage?.delegate = highlighter
+        
+        // 设置 typingAttributes，确保新输入的文字有正确颜色
+        tv.typingAttributes = [
             .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular),
             .foregroundColor: textColor
         ]
-        tv.typingAttributes = typingAttrs
-        if let storage = tv.textStorage {
+        
+        // 手动触发一次高亮
+        if let storage = tv.textStorage, storage.length > 0 {
             storage.beginEditing()
-            storage.replaceCharacters(
-                in: NSRange(location: 0, length: storage.length),
-                with: text
-            )
-            let fullRange = NSRange(location: 0, length: storage.length)
-            if fullRange.length > 0 {
-                storage.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular), range: fullRange)
-                storage.addAttribute(.foregroundColor, value: textColor, range: fullRange)
-            }
             highlighter.applyHighlighting(to: storage)
             storage.endEditing()
         }
+        
         ruler.refresh()
 
         return scrollView
@@ -262,20 +271,23 @@ struct CodeEditorView: NSViewRepresentable {
         if tv.string != text {
             context.coordinator.isUpdatingFromSwiftUI = true
             let ranges = tv.selectedRanges
+            
+            // 先保存 highlighter 引用，tv.string= 可能替换 textStorage 对象
+            let highlighter = tv.textStorage?.delegate as? SyntaxHighlighter
 
-            // 使用 replaceCharacters 而非 tv.string= ，保留 textStorage.delegate
-            if let storage = tv.textStorage {
+            tv.string = text
+
+            // tv.string= 可能替换 textStorage 对象导致 delegate 丢失，重新设置
+            if let h = highlighter {
+                tv.textStorage?.delegate = h
+            }
+
+            // tv.string= 之后重新设置属性和高亮
+            if let storage = tv.textStorage, storage.length > 0 {
                 storage.beginEditing()
-                storage.replaceCharacters(
-                    in: NSRange(location: 0, length: storage.length),
-                    with: text
-                )
-                // replaceCharacters 后需要重新设置字体（字符替换会丢失属性）
                 let fullRange = NSRange(location: 0, length: storage.length)
-                if fullRange.length > 0 {
-                    storage.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular), range: fullRange)
-                    storage.addAttribute(.foregroundColor, value: textColor, range: fullRange)
-                }
+                storage.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular), range: fullRange)
+                storage.addAttribute(.foregroundColor, value: textColor, range: fullRange)
                 if let h = storage.delegate as? SyntaxHighlighter {
                     h.applyHighlighting(to: storage)
                 }
@@ -293,7 +305,7 @@ struct CodeEditorView: NSViewRepresentable {
             context.coordinator.isUpdatingFromSwiftUI = false
         }
 
-        // 确保 typingAttributes 使用正确颜色（新输入的文字不会变透明）
+        // 确保 typingAttributes 使用正确颜色
         tv.typingAttributes = typingAttrs
 
         // 深浅色切换时同步背景色和光标色
@@ -428,8 +440,8 @@ struct EditorView: View {
 }
 
 // MARK: - Preview
-
-#Preview("Empty State") {
-    EditorView(editorViewModel: EditorViewModel(), gitViewModel: GitViewModel())
-        .frame(width: 700, height: 500)
-}
+//
+//#Preview("Empty State") {
+//    EditorView(editorViewModel: EditorViewModel(), gitViewModel: GitViewModel())
+//        .frame(width: 700, height: 500)
+//}
