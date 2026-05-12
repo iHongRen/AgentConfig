@@ -204,6 +204,9 @@ struct FileListView: View {
         files: [
             ConfigFile(url: URL(fileURLWithPath: "/Users/test/.claude/settings.json")),
             ConfigFile(url: URL(fileURLWithPath: "/Users/test/.claude/CLAUDE.md"), isModified: true)
+        ],
+        missingPaths: [
+            URL(fileURLWithPath: "/Users/test/.claude.json")
         ]
     )
     return FileListView(selection: .agent(category))

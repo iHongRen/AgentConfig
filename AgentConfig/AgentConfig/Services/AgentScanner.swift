@@ -21,8 +21,7 @@ protocol AgentScannerProtocol {
 
 /// 默认 Agent 扫描服务实现
 ///
-/// - 遍历 `AgentDefinitions.all`，对每个 Agent 检查其路径列表
-/// - 若任意路径存在则纳入结果，并枚举该路径下的配置文件（递归深度 ≤ 2）
+/// - 遍历 `AgentDefinitions.all`，仅检查每个 Agent 预定义的可编辑配置文件
 /// - `scanEnvFiles()` 检测所有已知环境变量文件路径
 struct AgentScanner: AgentScannerProtocol {
 
@@ -38,42 +37,29 @@ struct AgentScanner: AgentScannerProtocol {
         var categories: [AgentCategory] = []
 
         for definition in AgentDefinitions.all {
-            var collectedFiles: [ConfigFile] = []
+            let allURLs = definition.configFiles
+                .flatMap(\.resolvedURLs)
+                .uniqued(by: \.path)
 
-            for entry in definition.paths {
-                let url = entry.resolvedURL
-
-                if entry.isFile {
-                    // 单文件条目：直接检查文件是否存在
-                    if fileManager.fileExists(atPath: url.path) {
-                        let configFile = ConfigFile(url: url)
-                        if !collectedFiles.contains(where: { $0.url == url }) {
-                            collectedFiles.append(configFile)
-                        }
-                    }
-                } else {
-                    // 目录条目：枚举目录下的文件（深度 ≤ 2）
-                    var isDirectory: ObjCBool = false
-                    guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory),
-                          isDirectory.boolValue else {
-                        continue
-                    }
-
-                    let files = enumerateFiles(in: url, maxDepth: 2)
-                    for fileURL in files {
-                        if !collectedFiles.contains(where: { $0.url == fileURL }) {
-                            collectedFiles.append(ConfigFile(url: fileURL))
-                        }
-                    }
+            let collectedFiles = allURLs
+                .filter { fileManager.fileExists(atPath: $0.path) }
+                .map { ConfigFile(url: $0) }
+                .sorted {
+                    $0.url.lastPathComponent.localizedCaseInsensitiveCompare($1.url.lastPathComponent) == .orderedAscending
                 }
-            }
 
-            // 只有当该 Agent 至少有一个路径存在时，才纳入结果
+            let missingPaths = allURLs
+                .filter { !fileManager.fileExists(atPath: $0.path) }
+                .sorted {
+                    $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending
+                }
+
             if !collectedFiles.isEmpty {
                 let category = AgentCategory(
                     id: definition.id,
                     displayName: definition.displayName,
-                    files: collectedFiles
+                    files: collectedFiles,
+                    missingPaths: missingPaths
                 )
                 categories.append(category)
             }
@@ -112,57 +98,11 @@ struct AgentScanner: AgentScannerProtocol {
 
         return EnvCategory(files: existingFiles, missingPaths: missingPaths)
     }
+}
 
-    // MARK: - Private Helpers
-
-    /// 枚举目录下的所有文件，递归深度不超过 `maxDepth` 层
-    ///
-    /// - Parameters:
-    ///   - directory: 根目录 URL
-    ///   - maxDepth: 最大递归深度（相对于根目录，1 表示只枚举直接子文件）
-    /// - Returns: 所有找到的文件 URL 列表（不含目录）
-    private func enumerateFiles(in directory: URL, maxDepth: Int) -> [URL] {
-        var result: [URL] = []
-        enumerateFilesRecursive(in: directory, currentDepth: 1, maxDepth: maxDepth, result: &result)
-        return result
-    }
-
-    private func enumerateFilesRecursive(
-        in directory: URL,
-        currentDepth: Int,
-        maxDepth: Int,
-        result: inout [URL]
-    ) {
-        guard currentDepth <= maxDepth else { return }
-
-        let contents: [URL]
-        do {
-            contents = try fileManager.contentsOfDirectory(
-                at: directory,
-                includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey],
-                options: [.skipsHiddenFiles]
-            )
-        } catch {
-            return
-        }
-
-        for itemURL in contents {
-            var isDirectory: ObjCBool = false
-            fileManager.fileExists(atPath: itemURL.path, isDirectory: &isDirectory)
-
-            if isDirectory.boolValue {
-                // 只有在未达到最大深度时才递归进入子目录
-                if currentDepth < maxDepth {
-                    enumerateFilesRecursive(
-                        in: itemURL,
-                        currentDepth: currentDepth + 1,
-                        maxDepth: maxDepth,
-                        result: &result
-                    )
-                }
-            } else {
-                result.append(itemURL)
-            }
-        }
+private extension Array {
+    func uniqued<Key: Hashable>(by keyPath: KeyPath<Element, Key>) -> [Element] {
+        var seen: Set<Key> = []
+        return filter { seen.insert($0[keyPath: keyPath]).inserted }
     }
 }

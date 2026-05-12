@@ -7,24 +7,29 @@
 
 import Foundation
 
-// MARK: - AgentPathEntry
+// MARK: - AgentConfigEntry
 
-/// 描述一个 Agent 的路径条目
-/// - `path`：相对于用户主目录的路径字符串（以 `~/` 开头）
-/// - `isFile`：若为 `true`，表示该条目是单个文件而非目录
-struct AgentPathEntry {
-    let path: String
-    let isFile: Bool
+/// 描述一个 Agent 的可编辑配置文件条目。
+struct AgentConfigEntry {
+    let title: String
+    let candidatePaths: [String]
 
-    init(_ path: String, isFile: Bool = false) {
-        self.path = path
-        self.isFile = isFile
+    init(_ path: String) {
+        self.title = URL(fileURLWithPath: path).lastPathComponent
+        self.candidatePaths = [path]
     }
 
-    /// 展开为绝对 URL
-    var resolvedURL: URL {
-        let expanded = (path as NSString).expandingTildeInPath
-        return URL(fileURLWithPath: expanded)
+    init(title: String, candidatePaths: [String]) {
+        self.title = title
+        self.candidatePaths = candidatePaths
+    }
+
+    /// 展开所有候选路径为绝对 URL
+    var resolvedURLs: [URL] {
+        candidatePaths.map {
+            let expanded = ($0 as NSString).expandingTildeInPath
+            return URL(fileURLWithPath: expanded)
+        }
     }
 }
 
@@ -36,16 +41,15 @@ struct AgentDefinition {
     let id: String
     /// 用户可见的显示名称
     let displayName: String
-    /// 该 Agent 的所有已知路径（目录或文件）
-    let paths: [AgentPathEntry]
+    /// 该 Agent 应展示的可编辑配置文件列表
+    let configFiles: [AgentConfigEntry]
 }
 
 // MARK: - AgentDefinitions
 
 /// 所有已知 Code Agent 的静态路径配置表
 ///
-/// 扫描时按顺序检查每个 Agent 的路径列表，
-/// 若任意路径存在则将该 Agent 纳入扫描结果。
+/// 扫描时仅检查每个 Agent 的预定义配置文件列表。
 enum AgentDefinitions {
 
     /// 所有已知 Agent 的定义列表（按字母顺序排列）
@@ -53,85 +57,175 @@ enum AgentDefinitions {
         AgentDefinition(
             id: "claude",
             displayName: "Claude Code",
-            paths: [
-                AgentPathEntry("~/.claude"),
-                AgentPathEntry("~/.config/claude"),
-                AgentPathEntry("~/Library/Application Support/Claude")
+            configFiles: [
+                AgentConfigEntry(title: "settings.json", candidatePaths: [
+                    "~/.claude/settings.json",
+                    "~/.claude.json"
+                ]),
+                AgentConfigEntry("~/.claude/settings.local.json"),
+                AgentConfigEntry("~/.claude/CLAUDE.md"),
+                AgentConfigEntry("~/.claude/mcp.json")
             ]
         ),
         AgentDefinition(
             id: "qwen",
             displayName: "Qwen Code",
-            paths: [
-                AgentPathEntry("~/.qwen"),
-                AgentPathEntry("~/.config/qwen")
+            configFiles: [
+                AgentConfigEntry(title: "config.json", candidatePaths: [
+                    "~/.qwen/config.json",
+                    "~/.config/qwen/config.json"
+                ]),
+                AgentConfigEntry(title: "settings.json", candidatePaths: [
+                    "~/.qwen/settings.json",
+                    "~/.config/qwen/settings.json"
+                ])
             ]
         ),
         AgentDefinition(
             id: "codex",
             displayName: "Codex CLI",
-            paths: [
-                AgentPathEntry("~/.codex"),
-                AgentPathEntry("~/.config/codex")
+            configFiles: [
+                AgentConfigEntry("~/.codex/auth.json"),
+                AgentConfigEntry(title: "config.toml", candidatePaths: [
+                    "~/.codex/config.toml",
+                    "~/.config/codex/config.toml"
+                ]),
+                AgentConfigEntry("~/.codex/instructions.md"),
+                AgentConfigEntry("~/.codex/mcp.json")
             ]
         ),
         AgentDefinition(
             id: "opencode",
             displayName: "OpenCode CLI",
-            paths: [
-                AgentPathEntry("~/.opencode"),
-                AgentPathEntry("~/.config/opencode")
+            configFiles: [
+                AgentConfigEntry(title: "config.json", candidatePaths: [
+                    "~/.opencode/config.json",
+                    "~/.config/opencode/config.json"
+                ]),
+                AgentConfigEntry("~/.opencode/config.toml"),
+                AgentConfigEntry("~/.opencode/agents.json")
             ]
         ),
         AgentDefinition(
             id: "github-copilot",
             displayName: "GitHub Copilot",
-            paths: [
-                AgentPathEntry("~/.config/github-copilot")
+            configFiles: [
+                AgentConfigEntry("~/.config/github-copilot/settings.json"),
+                AgentConfigEntry("~/.config/github-copilot/mcp.json")
             ]
         ),
         AgentDefinition(
             id: "cursor",
             displayName: "Cursor",
-            paths: [
-                AgentPathEntry("~/Library/Application Support/Cursor/User")
+            configFiles: [
+                AgentConfigEntry("~/Library/Application Support/Cursor/User/settings.json"),
+                AgentConfigEntry("~/Library/Application Support/Cursor/User/keybindings.json"),
+                AgentConfigEntry("~/Library/Application Support/Cursor/User/mcp.json"),
+                AgentConfigEntry("~/Library/Application Support/Cursor/User/snippets.json")
+            ]
+        ),
+        AgentDefinition(
+            id: "windsurf",
+            displayName: "Windsurf",
+            configFiles: [
+                AgentConfigEntry("~/Library/Application Support/Windsurf/User/settings.json"),
+                AgentConfigEntry("~/Library/Application Support/Windsurf/User/keybindings.json"),
+                AgentConfigEntry("~/Library/Application Support/Windsurf/User/mcp.json")
             ]
         ),
         AgentDefinition(
             id: "continue",
             displayName: "Continue",
-            paths: [
-                AgentPathEntry("~/.continue")
-            ]
-        ),
-        AgentDefinition(
-            id: "cody",
-            displayName: "Cody",
-            paths: [
-                AgentPathEntry("~/.config/cody")
+            configFiles: [
+                AgentConfigEntry("~/.continue/config.json"),
+                AgentConfigEntry("~/.continue/config.yaml"),
+                AgentConfigEntry("~/.continue/prompts/chat.md"),
+                AgentConfigEntry("~/.continue/rules.md")
             ]
         ),
         AgentDefinition(
             id: "aider",
             displayName: "Aider",
-            paths: [
-                AgentPathEntry("~/.aider"),
-                AgentPathEntry("~/.aider.conf.yml", isFile: true)
+            configFiles: [
+                AgentConfigEntry("~/.aider.conf.yml"),
+                AgentConfigEntry("~/.aider.model.settings.yml")
             ]
         ),
         AgentDefinition(
             id: "gemini",
             displayName: "Gemini CLI",
-            paths: [
-                AgentPathEntry("~/.gemini"),
-                AgentPathEntry("~/.config/gemini")
+            configFiles: [
+                AgentConfigEntry(title: "settings.json", candidatePaths: [
+                    "~/.gemini/settings.json",
+                    "~/.config/gemini/settings.json"
+                ]),
+                AgentConfigEntry("~/.gemini/config.json")
+            ]
+        ),
+        AgentDefinition(
+            id: "cline",
+            displayName: "Cline",
+            configFiles: [
+                AgentConfigEntry("~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"),
+                AgentConfigEntry("~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_custom_instructions.md")
+            ]
+        ),
+        AgentDefinition(
+            id: "roo-code",
+            displayName: "Roo Code",
+            configFiles: [
+                AgentConfigEntry("~/Library/Application Support/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/mcp_settings.json"),
+                AgentConfigEntry("~/Library/Application Support/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/custom_instructions.md")
+            ]
+        ),
+        AgentDefinition(
+            id: "kilocode",
+            displayName: "Kilo Code",
+            configFiles: [
+                AgentConfigEntry("~/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code/settings/mcp_settings.json"),
+                AgentConfigEntry("~/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code/settings/custom_instructions.md")
+            ]
+        ),
+        AgentDefinition(
+            id: "trae",
+            displayName: "Trae",
+            configFiles: [
+                AgentConfigEntry("~/Library/Application Support/Trae/User/settings.json"),
+                AgentConfigEntry("~/Library/Application Support/Trae/User/keybindings.json"),
+                AgentConfigEntry("~/Library/Application Support/Trae/User/mcp.json")
+            ]
+        ),
+        AgentDefinition(
+            id: "cody",
+            displayName: "Cody",
+            configFiles: [
+                AgentConfigEntry("~/.config/cody/config.json"),
+                AgentConfigEntry("~/.config/cody/mcp.json")
             ]
         ),
         AgentDefinition(
             id: "amazonq",
             displayName: "Amazon Q",
-            paths: [
-                AgentPathEntry("~/.aws/amazonq")
+            configFiles: [
+                AgentConfigEntry("~/.aws/amazonq/settings.json"),
+                AgentConfigEntry("~/.aws/amazonq/mcp.json"),
+                AgentConfigEntry("~/.aws/amazonq/cli.json")
+            ]
+        ),
+        AgentDefinition(
+            id: "augment",
+            displayName: "Augment",
+            configFiles: [
+                AgentConfigEntry("~/Library/Application Support/Augment/User/settings.json"),
+                AgentConfigEntry("~/Library/Application Support/Augment/User/mcp.json")
+            ]
+        ),
+        AgentDefinition(
+            id: "boltai",
+            displayName: "BoltAI",
+            configFiles: [
+                AgentConfigEntry("~/Library/Application Support/BoltAI/settings.json"),
+                AgentConfigEntry("~/Library/Application Support/BoltAI/prompts.json")
             ]
         )
     ]

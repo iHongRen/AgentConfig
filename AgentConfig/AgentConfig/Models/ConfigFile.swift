@@ -84,6 +84,7 @@ struct AgentCategory: Identifiable, Equatable {
     let id: String
     let displayName: String
     let files: [ConfigFile]
+    let missingPaths: [URL]
 }
 
 // MARK: - EnvCategory

@@ -69,12 +69,9 @@ struct SidebarView: View {
         }
         .navigationSplitViewColumnWidth(min: 260, ideal: 292, max: 360)
         .onAppear {
-            expandedAgentIDs.formUnion(appViewModel.agentCategories.map(\.id))
             expandedCustomPathIDs.formUnion(appViewModel.customPathGroups.map(\.id))
         }
-        .onChange(of: appViewModel.agentCategories) { _, categories in
-            expandedAgentIDs.formUnion(categories.map(\.id))
-        }
+        .onChange(of: appViewModel.agentCategories) { _, _ in }
         .onChange(of: appViewModel.customPathGroups) { _, groups in
             expandedCustomPathIDs.formUnion(groups.map(\.id))
         }
@@ -110,13 +107,17 @@ struct SidebarView: View {
         ForEach(appViewModel.agentCategories) { category in
             SidebarDisclosureSection(
                 title: category.displayName,
-                count: category.files.count,
+                count: category.files.count + category.missingPaths.count,
                 icon: agentIcon(for: category.id),
                 iconColor: agentColor(for: category.id),
                 isExpanded: bindingForAgent(category.id)
             ) {
                 ForEach(category.files) { file in
                     fileRow(file)
+                }
+
+                ForEach(category.missingPaths, id: \.absoluteString) { missingURL in
+                    missingFileRow(missingURL)
                 }
             }
         }

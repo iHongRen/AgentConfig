@@ -232,12 +232,12 @@ private struct AgentRowView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(agent.displayName)
                 .fontWeight(.medium)
-            ForEach(agent.paths, id: \.path) { entry in
+            ForEach(agent.configFiles, id: \.title) { entry in
                 HStack(spacing: 4) {
-                    Image(systemName: entry.isFile ? "doc" : "folder")
+                    Image(systemName: "doc")
                         .font(.caption2)
                         .foregroundColor(.secondary)
-                    Text(entry.path)
+                    Text(entry.title)
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .textSelection(.enabled)
