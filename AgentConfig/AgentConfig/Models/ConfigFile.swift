@@ -13,6 +13,8 @@ import Foundation
 enum FileType: Equatable {
     case json
     case jsonc
+    case json5
+    case jsonl
     case yaml
     case toml
     case shell
@@ -27,6 +29,10 @@ enum FileType: Equatable {
             return .json
         case "jsonc":
             return .jsonc
+        case "json5":
+            return .json5
+        case "jsonl", "ndjson":
+            return .jsonl
         case "yaml", "yml":
             return .yaml
         case "toml":

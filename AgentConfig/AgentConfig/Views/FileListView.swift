@@ -164,7 +164,7 @@ struct FileListView: View {
     /// 根据文件类型返回对应的 SF Symbol 图标名称
     private func fileTypeIcon(for fileType: FileType) -> String {
         switch fileType {
-        case .json, .jsonc:
+        case .json, .jsonc, .json5, .jsonl:
             return "curlybraces"
         case .yaml:
             return "list.bullet.indent"

@@ -124,7 +124,7 @@ struct EditorToolbarView: View {
         }
         .buttonStyle(.borderless)
         .controlSize(.small)
-        .help(NSLocalizedString("toolbar.format.help", value: "将 JSON 内容格式化为 2 空格缩进", comment: "Format button tooltip"))
+        .help(NSLocalizedString("toolbar.format.help", value: "将 JSON 内容格式化为 4 空格缩进", comment: "Format button tooltip"))
     }
 
     /// 历史记录按钮
@@ -182,10 +182,15 @@ struct EditorToolbarView: View {
             ?? NSLocalizedString("toolbar.noFile", value: "未打开文件", comment: "Placeholder when no file is open")
     }
 
-    /// 当前文件是否为 JSON 或 JSONC 类型
+    /// 当前文件是否为 JSON 系列类型
     private var isJSONFile: Bool {
         guard let file = editorViewModel.currentFile else { return false }
-        return file.fileType == .json || file.fileType == .jsonc
+        switch file.fileType {
+        case .json, .jsonc, .json5, .jsonl:
+            return true
+        default:
+            return false
+        }
     }
 
     // MARK: - Actions

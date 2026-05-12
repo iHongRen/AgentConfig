@@ -334,7 +334,7 @@ final class EditorViewModel: ObservableObject {
 
     // MARK: - JSON Formatting
 
-    /// 将当前内容格式化为 2 空格缩进的 JSON
+    /// 将当前内容格式化为 4 空格缩进的 JSON
     ///
     /// 格式化成功后更新 `content`；失败时抛出 `AppError.jsonFormatError`，不修改原内容。
     /// - Throws: `AppError.jsonFormatError(line:column:message:)` 格式化失败时
@@ -347,9 +347,8 @@ final class EditorViewModel: ObservableObject {
                 withJSONObject: jsonObject,
                 options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
             )
-            // JSONSerialization.prettyPrinted 使用 4 空格缩进，需转换为 2 空格
-            if var formattedString = String(data: formattedData, encoding: .utf8) {
-                formattedString = convertToTwoSpaceIndent(formattedString)
+            // JSONSerialization.prettyPrinted 在 macOS 上使用 4 空格缩进。
+            if let formattedString = String(data: formattedData, encoding: .utf8) {
                 isLoadingContent = true
                 content = formattedString
                 isLoadingContent = false
@@ -375,27 +374,6 @@ final class EditorViewModel: ObservableObject {
         }
         // 内容变更后清空重做栈
         redoStack = []
-    }
-
-    /// 将 4 空格缩进转换为 2 空格缩进
-    private func convertToTwoSpaceIndent(_ input: String) -> String {
-        let lines = input.components(separatedBy: "\n")
-        let converted = lines.map { line -> String in
-            var leadingSpaces = 0
-            for char in line {
-                if char == " " {
-                    leadingSpaces += 1
-                } else {
-                    break
-                }
-            }
-            // 每 4 个空格替换为 2 个空格
-            let indentLevel = leadingSpaces / 4
-            let remainder = leadingSpaces % 4
-            let newIndent = String(repeating: "  ", count: indentLevel) + String(repeating: " ", count: remainder)
-            return newIndent + line.dropFirst(leadingSpaces)
-        }
-        return converted.joined(separator: "\n")
     }
 
     /// 从 NSError 中提取 JSON 错误的行列信息

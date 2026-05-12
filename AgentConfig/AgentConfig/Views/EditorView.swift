@@ -131,6 +131,7 @@ struct CodeEditorView: NSViewRepresentable {
         var lastHighlightedFileType: FileType?
         var lastHighlightedIsDarkMode: Bool?
         var highlighter: SyntaxHighlighter?
+        var isComposingMarkedText = false
 
         init(_ parent: CodeEditorView) {
             self.parent = parent
@@ -139,18 +140,50 @@ struct CodeEditorView: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard !isUpdatingFromSwiftUI,
                   let tv = notification.object as? NSTextView else { return }
+
+            if tv.hasMarkedText() {
+                isComposingMarkedText = true
+                updateCursorPosition(for: tv)
+                refreshLineNumberRuler(for: tv)
+                return
+            }
+
+            let finishedMarkedText = isComposingMarkedText
+            isComposingMarkedText = false
+
             let newText = tv.string
             if parent.text != newText {
                 parent.text = newText
             }
-            if let sv = tv.enclosingScrollView,
-               let ruler = sv.verticalRulerView as? LineNumberRulerView {
-                ruler.refresh()
+
+            if finishedMarkedText {
+                DispatchQueue.main.async { [weak self, weak tv] in
+                    guard let self, let tv else { return }
+                    self.applyHighlightingPreservingSelection(in: tv)
+                    self.refreshLineNumberRuler(for: tv)
+                }
+            } else {
+                applyHighlightingPreservingSelection(in: tv)
+                refreshLineNumberRuler(for: tv)
             }
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
             guard let tv = notification.object as? NSTextView else { return }
+
+            if isComposingMarkedText && !tv.hasMarkedText() {
+                isComposingMarkedText = false
+                let newText = tv.string
+                if parent.text != newText {
+                    parent.text = newText
+                }
+                DispatchQueue.main.async { [weak self, weak tv] in
+                    guard let self, let tv else { return }
+                    self.applyHighlightingPreservingSelection(in: tv)
+                    self.refreshLineNumberRuler(for: tv)
+                }
+            }
+
             updateCursorPosition(for: tv)
         }
 
@@ -168,6 +201,33 @@ struct CodeEditorView: NSViewRepresentable {
             if parent.cursorColumn != column {
                 parent.cursorColumn = column
             }
+        }
+
+        func refreshLineNumberRuler(for textView: NSTextView) {
+            if let sv = textView.enclosingScrollView,
+               let ruler = sv.verticalRulerView as? LineNumberRulerView {
+                ruler.refresh()
+            }
+        }
+
+        func applyHighlightingPreservingSelection(in textView: NSTextView) {
+            guard !textView.hasMarkedText() else { return }
+            guard let storage = textView.textStorage else { return }
+
+            let ranges = textView.selectedRanges
+            let length = storage.length
+
+            storage.beginEditing()
+            highlighter?.applyHighlighting(to: storage)
+            storage.endEditing()
+
+            textView.selectedRanges = ranges.map { value in
+                let range = value.rangeValue
+                let location = min(range.location, length)
+                let end = min(range.location + range.length, length)
+                return NSValue(range: NSRange(location: location, length: end - location))
+            }
+            updateCursorPosition(for: textView)
         }
     }
 
@@ -277,7 +337,10 @@ struct CodeEditorView: NSViewRepresentable {
         // 检测需要重新高亮的条件
         let fileTypeChanged = context.coordinator.lastHighlightedFileType != fileType
         let darkModeChanged = context.coordinator.lastHighlightedIsDarkMode != isDarkMode
-        let contentChanged = tv.string != text
+        let isComposingMarkedText = tv.hasMarkedText() || context.coordinator.isComposingMarkedText
+        let contentChanged = !isComposingMarkedText
+            && !context.coordinator.isUpdatingFromSwiftUI
+            && tv.string != text
 
         // 同步高亮器的 fileType / isDarkMode
         if context.coordinator.highlighter == nil {
@@ -309,15 +372,8 @@ struct CodeEditorView: NSViewRepresentable {
         }
 
         // 内容变化、fileType 变化、深浅色变化时重新高亮
-        if contentChanged || fileTypeChanged || darkModeChanged {
-            if let storage = tv.textStorage, storage.length > 0 {
-                storage.beginEditing()
-                let fullRange = NSRange(location: 0, length: storage.length)
-                storage.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular), range: fullRange)
-                storage.addAttribute(.foregroundColor, value: textColor, range: fullRange)
-                context.coordinator.highlighter?.applyHighlighting(to: storage)
-                storage.endEditing()
-            }
+        if !isComposingMarkedText && (contentChanged || fileTypeChanged || darkModeChanged) {
+            context.coordinator.applyHighlightingPreservingSelection(in: tv)
             context.coordinator.lastHighlightedFileType = fileType
             context.coordinator.lastHighlightedIsDarkMode = isDarkMode
         }
@@ -501,6 +557,10 @@ struct EditorView: View {
             return "JSON"
         case .jsonc:
             return "JSONC"
+        case .json5:
+            return "JSON5"
+        case .jsonl:
+            return "JSONL"
         case .yaml:
             return "YAML"
         case .toml:

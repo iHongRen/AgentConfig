@@ -306,7 +306,7 @@ struct SidebarView: View {
 
     private func fileTypeIcon(for fileType: FileType) -> String {
         switch fileType {
-        case .json, .jsonc:
+        case .json, .jsonc, .json5, .jsonl:
             return "curlybraces"
         case .yaml:
             return "list.bullet.indent"

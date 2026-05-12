@@ -83,11 +83,9 @@ final class SyntaxHighlighter: NSObject, NSTextStorageDelegate {
         range editedRange: NSRange,
         changeInLength delta: Int
     ) {
-        // 防止递归：高亮过程中不再触发
-        guard !isHighlighting else { return }
-        // 仅在文本内容变化时重新高亮（忽略纯属性变化）
-        guard editedMask.contains(.editedCharacters) else { return }
-        applyHighlighting(to: textStorage)
+        // 高亮由 NSTextViewDelegate 在文本变更完成后触发，避免在编辑事务中
+        // 修改属性导致光标位置被 AppKit 重置。
+        return
     }
 
     // MARK: - Public Methods
@@ -108,23 +106,12 @@ final class SyntaxHighlighter: NSObject, NSTextStorageDelegate {
             range: fullRange
         )
 
-        // 按规则顺序叠加高亮颜色
+        // JSON 类文件需要避免字符串中的数字再次被数字规则覆盖。
         if !rules.isEmpty {
-            let str = textStorage.string as NSString
-            for rule in rules {
-                let matches = rule.pattern.matches(
-                    in: textStorage.string, options: [], range: fullRange
-                )
-                for match in matches {
-                    let highlightRange = match.numberOfRanges > 1
-                        ? match.range(at: 1)
-                        : match.range
-                    guard highlightRange.location != NSNotFound,
-                          NSMaxRange(highlightRange) <= str.length else { continue }
-                    textStorage.addAttribute(
-                        .foregroundColor, value: rule.color, range: highlightRange
-                    )
-                }
+            if isJSONLikeFileType {
+                applyJSONLikeHighlighting(to: textStorage, range: fullRange)
+            } else {
+                applyStandardHighlighting(to: textStorage, range: fullRange)
             }
         }
 
@@ -136,7 +123,7 @@ final class SyntaxHighlighter: NSObject, NSTextStorageDelegate {
     /// 根据当前 fileType 和 isDarkMode 重新构建高亮规则
     private func rebuildRules() {
         switch fileType {
-        case .json, .jsonc:
+        case .json, .jsonc, .json5, .jsonl:
             rules = buildJSONRules()
         case .yaml:
             rules = buildYAMLRules()
@@ -186,8 +173,8 @@ final class SyntaxHighlighter: NSObject, NSTextStorageDelegate {
             rules.append(HighlightRule(pattern: pattern, color: keyNameColor))
         }
 
-        // 5. JSONC 单行注释（灰色）— // ...
-        if fileType == .jsonc {
+        // 5. JSONC/JSON5 注释（灰色）— // ... 或 /* ... */
+        if fileType == .jsonc || fileType == .json5 {
             if let pattern = try? NSRegularExpression(pattern: #"//[^\n]*"#) {
                 rules.append(HighlightRule(pattern: pattern, color: commentColor))
             }
@@ -201,6 +188,73 @@ final class SyntaxHighlighter: NSObject, NSTextStorageDelegate {
         }
 
         return rules
+    }
+
+    private var isJSONLikeFileType: Bool {
+        switch fileType {
+        case .json, .jsonc, .json5, .jsonl:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func applyStandardHighlighting(to textStorage: NSTextStorage, range fullRange: NSRange) {
+        let str = textStorage.string as NSString
+
+        for rule in rules {
+            let matches = rule.pattern.matches(
+                in: textStorage.string, options: [], range: fullRange
+            )
+            for match in matches {
+                let highlightRange = match.numberOfRanges > 1
+                    ? match.range(at: 1)
+                    : match.range
+                guard highlightRange.location != NSNotFound,
+                      NSMaxRange(highlightRange) <= str.length else { continue }
+                textStorage.addAttribute(
+                    .foregroundColor, value: rule.color, range: highlightRange
+                )
+            }
+        }
+    }
+
+    private func applyJSONLikeHighlighting(to textStorage: NSTextStorage, range fullRange: NSRange) {
+        let source = textStorage.string as NSString
+        guard let stringRule = rules.first else { return }
+
+        let stringMatches = stringRule.pattern.matches(
+            in: textStorage.string, options: [], range: fullRange
+        )
+        let stringRanges = stringMatches.map(\.range)
+
+        for stringRange in stringRanges where isValid(stringRange, in: source) {
+            textStorage.addAttribute(.foregroundColor, value: stringColor, range: stringRange)
+        }
+
+        for rule in rules.dropFirst() {
+            let matches = rule.pattern.matches(in: textStorage.string, options: [], range: fullRange)
+            for match in matches {
+                let highlightRange = match.numberOfRanges > 1 ? match.range(at: 1) : match.range
+                guard isValid(highlightRange, in: source) else { continue }
+
+                if rule.color != commentColor && intersectsAnyStringRange(highlightRange, stringRanges: stringRanges) {
+                    continue
+                }
+
+                textStorage.addAttribute(
+                    .foregroundColor, value: rule.color, range: highlightRange
+                )
+            }
+        }
+    }
+
+    private func intersectsAnyStringRange(_ range: NSRange, stringRanges: [NSRange]) -> Bool {
+        stringRanges.contains { NSIntersectionRange($0, range).length > 0 }
+    }
+
+    private func isValid(_ range: NSRange, in source: NSString) -> Bool {
+        range.location != NSNotFound && NSMaxRange(range) <= source.length
     }
 
     // MARK: - YAML Rules
