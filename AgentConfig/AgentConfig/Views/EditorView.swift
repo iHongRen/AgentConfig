@@ -37,25 +37,14 @@ final class LineNumberRulerView: NSRulerView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        // 用 NSGraphicsContext 保存状态，并严格 clip 到自身 bounds，
-        // 防止任何绘制溢出到 textView 区域
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
 
-        // clip 到 ruler 自身的 bounds，绝对不会溢出
         NSBezierPath(rect: bounds).setClip()
 
-        // 背景
-        NSColor(white: 0.96, alpha: 1.0).setFill()
+        let isDark = textView?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        (isDark ? NSColor(white: 0.13, alpha: 1) : NSColor(white: 0.985, alpha: 1)).setFill()
         bounds.fill()
-
-        // 右侧分隔线
-        NSColor.separatorColor.setStroke()
-        let line = NSBezierPath()
-        line.move(to: NSPoint(x: bounds.maxX - 0.5, y: dirtyRect.minY))
-        line.line(to: NSPoint(x: bounds.maxX - 0.5, y: dirtyRect.maxY))
-        line.lineWidth = 0.5
-        line.stroke()
 
         drawLineNumbers()
     }
@@ -128,6 +117,8 @@ final class LineNumberRulerView: NSRulerView {
 struct CodeEditorView: NSViewRepresentable {
 
     @Binding var text: String
+    @Binding var cursorLine: Int
+    @Binding var cursorColumn: Int
     var fileType: FileType
     var isDarkMode: Bool
 
@@ -136,6 +127,10 @@ struct CodeEditorView: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: CodeEditorView
         var isUpdatingFromSwiftUI = false
+        // 记录上次高亮时的状态，避免不必要的全量重高亮
+        var lastHighlightedFileType: FileType?
+        var lastHighlightedIsDarkMode: Bool?
+        var highlighter: SyntaxHighlighter?
 
         init(_ parent: CodeEditorView) {
             self.parent = parent
@@ -153,6 +148,27 @@ struct CodeEditorView: NSViewRepresentable {
                 ruler.refresh()
             }
         }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let tv = notification.object as? NSTextView else { return }
+            updateCursorPosition(for: tv)
+        }
+
+        func updateCursorPosition(for textView: NSTextView) {
+            let selectedLocation = textView.selectedRange().location
+            let safeLocation = min(selectedLocation, (textView.string as NSString).length)
+            let prefix = (textView.string as NSString).substring(to: safeLocation)
+            let lines = prefix.components(separatedBy: "\n")
+            let line = max(lines.count, 1)
+            let column = (lines.last?.count ?? 0) + 1
+
+            if parent.cursorLine != line {
+                parent.cursorLine = line
+            }
+            if parent.cursorColumn != column {
+                parent.cursorColumn = column
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -166,7 +182,8 @@ struct CodeEditorView: NSViewRepresentable {
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
-        scrollView.backgroundColor = isDarkMode ? NSColor(white: 0.12, alpha: 1) : NSColor(white: 0.98, alpha: 1)
+        scrollView.drawsBackground = true
+        scrollView.backgroundColor = editorBackgroundColor
 
         // 2. TextView — 先给一个非零 frame，之后会随 scrollView 自动调整
         let tv = NSTextView(frame: NSRect(x: 0, y: 0, width: 100, height: 100))
@@ -187,10 +204,11 @@ struct CodeEditorView: NSViewRepresentable {
         // 4. 外观
         let textColor = isDarkMode ? NSColor(white: 0.92, alpha: 1) : NSColor(white: 0.10, alpha: 1)
         tv.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
-        tv.backgroundColor = isDarkMode ? NSColor(white: 0.12, alpha: 1) : NSColor(white: 0.98, alpha: 1)
+        tv.backgroundColor = editorBackgroundColor
+        tv.drawsBackground = true
         tv.textColor = textColor
         tv.insertionPointColor = textColor
-        tv.textContainerInset = NSSize(width: 4, height: 4)
+        tv.textContainerInset = NSSize(width: 16, height: 14)
 
         // 5. 编辑行为
         tv.isEditable = true
@@ -210,8 +228,8 @@ struct CodeEditorView: NSViewRepresentable {
         scrollView.documentView = tv
 
         // 8. 语法高亮 — 在 documentView 设置之后再设置 delegate
-        let highlighter = SyntaxHighlighter(fileType: fileType, isDarkMode: isDarkMode)
-        tv.textStorage?.delegate = highlighter
+        context.coordinator.highlighter = SyntaxHighlighter(fileType: fileType, isDarkMode: isDarkMode)
+        tv.textStorage?.delegate = context.coordinator.highlighter
 
         // 9. 行号 ruler
         let ruler = LineNumberRulerView(scrollView: scrollView, textView: tv)
@@ -224,7 +242,7 @@ struct CodeEditorView: NSViewRepresentable {
         tv.string = text
         
         // tv.string= 可能会替换 textStorage 对象，导致 delegate 丢失，重新设置
-        tv.textStorage?.delegate = highlighter
+        tv.textStorage?.delegate = context.coordinator.highlighter
         
         // 设置 typingAttributes，确保新输入的文字有正确颜色
         tv.typingAttributes = [
@@ -235,11 +253,12 @@ struct CodeEditorView: NSViewRepresentable {
         // 手动触发一次高亮
         if let storage = tv.textStorage, storage.length > 0 {
             storage.beginEditing()
-            highlighter.applyHighlighting(to: storage)
+            context.coordinator.highlighter?.applyHighlighting(to: storage)
             storage.endEditing()
         }
         
         ruler.refresh()
+        context.coordinator.updateCursorPosition(for: tv)
 
         return scrollView
     }
@@ -255,44 +274,28 @@ struct CodeEditorView: NSViewRepresentable {
             .foregroundColor: textColor
         ]
 
-        // 更新高亮器配置
-        if let h = tv.textStorage?.delegate as? SyntaxHighlighter {
-            var needsRehighlight = false
-            if h.fileType != fileType { h.fileType = fileType; needsRehighlight = true }
-            if h.isDarkMode != isDarkMode { h.isDarkMode = isDarkMode; needsRehighlight = true }
-            if needsRehighlight, let storage = tv.textStorage {
-                storage.beginEditing()
-                h.applyHighlighting(to: storage)
-                storage.endEditing()
-            }
+        // 检测需要重新高亮的条件
+        let fileTypeChanged = context.coordinator.lastHighlightedFileType != fileType
+        let darkModeChanged = context.coordinator.lastHighlightedIsDarkMode != isDarkMode
+        let contentChanged = tv.string != text
+
+        // 同步高亮器的 fileType / isDarkMode
+        if context.coordinator.highlighter == nil {
+            context.coordinator.highlighter = SyntaxHighlighter(fileType: fileType, isDarkMode: isDarkMode)
+            tv.textStorage?.delegate = context.coordinator.highlighter
         }
 
-        // 仅在内容真正不同时才更新，避免光标跳动
-        if tv.string != text {
+        context.coordinator.highlighter?.fileType = fileType
+        context.coordinator.highlighter?.isDarkMode = isDarkMode
+
+        if contentChanged {
             context.coordinator.isUpdatingFromSwiftUI = true
             let ranges = tv.selectedRanges
-            
-            // 先保存 highlighter 引用，tv.string= 可能替换 textStorage 对象
-            let highlighter = tv.textStorage?.delegate as? SyntaxHighlighter
 
             tv.string = text
 
-            // tv.string= 可能替换 textStorage 对象导致 delegate 丢失，重新设置
-            if let h = highlighter {
-                tv.textStorage?.delegate = h
-            }
-
-            // tv.string= 之后重新设置属性和高亮
-            if let storage = tv.textStorage, storage.length > 0 {
-                storage.beginEditing()
-                let fullRange = NSRange(location: 0, length: storage.length)
-                storage.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular), range: fullRange)
-                storage.addAttribute(.foregroundColor, value: textColor, range: fullRange)
-                if let h = storage.delegate as? SyntaxHighlighter {
-                    h.applyHighlighting(to: storage)
-                }
-                storage.endEditing()
-            }
+            // tv.string= 可能替换 textStorage 对象导致 delegate 丢失，重新绑定
+            tv.textStorage?.delegate = context.coordinator.highlighter
 
             // 恢复光标位置（clamp 防越界）
             let len = (text as NSString).length
@@ -305,18 +308,44 @@ struct CodeEditorView: NSViewRepresentable {
             context.coordinator.isUpdatingFromSwiftUI = false
         }
 
+        // 内容变化、fileType 变化、深浅色变化时重新高亮
+        if contentChanged || fileTypeChanged || darkModeChanged {
+            if let storage = tv.textStorage, storage.length > 0 {
+                storage.beginEditing()
+                let fullRange = NSRange(location: 0, length: storage.length)
+                storage.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular), range: fullRange)
+                storage.addAttribute(.foregroundColor, value: textColor, range: fullRange)
+                context.coordinator.highlighter?.applyHighlighting(to: storage)
+                storage.endEditing()
+            }
+            context.coordinator.lastHighlightedFileType = fileType
+            context.coordinator.lastHighlightedIsDarkMode = isDarkMode
+        }
+
+        if context.coordinator.lastHighlightedFileType == nil {
+            context.coordinator.lastHighlightedFileType = fileType
+        }
+        if context.coordinator.lastHighlightedIsDarkMode == nil {
+            context.coordinator.lastHighlightedIsDarkMode = isDarkMode
+        }
+
         // 确保 typingAttributes 使用正确颜色
         tv.typingAttributes = typingAttrs
 
         // 深浅色切换时同步背景色和光标色
-        tv.backgroundColor = isDarkMode ? NSColor(white: 0.12, alpha: 1) : NSColor(white: 0.98, alpha: 1)
+        tv.backgroundColor = editorBackgroundColor
         tv.insertionPointColor = textColor
-        scrollView.backgroundColor = isDarkMode ? NSColor(white: 0.12, alpha: 1) : NSColor(white: 0.98, alpha: 1)
+        scrollView.backgroundColor = editorBackgroundColor
 
         // 刷新行号
         if let ruler = scrollView.verticalRulerView as? LineNumberRulerView {
             ruler.refresh()
         }
+        context.coordinator.updateCursorPosition(for: tv)
+    }
+
+    private var editorBackgroundColor: NSColor {
+        isDarkMode ? NSColor(white: 0.12, alpha: 1) : NSColor(white: 0.985, alpha: 1)
     }
 }
 
@@ -331,6 +360,8 @@ struct EditorView: View {
 
     @State private var isSearchBarVisible = false
     @State private var isShowingHistory = false
+    @State private var cursorLine = 1
+    @State private var cursorColumn = 1
     @State private var toastMessage: String? = nil
     @State private var toastTask: Task<Void, Never>? = nil
 
@@ -339,6 +370,11 @@ struct EditorView: View {
             EditorToolbarView(
                 editorViewModel: editorViewModel,
                 gitViewModel: gitViewModel,
+                onShowSearch: {
+                    withAnimation(.easeInOut(duration: 0.16)) {
+                        isSearchBarVisible = true
+                    }
+                },
                 onShowHistory: { isShowingHistory = true }
             )
 
@@ -347,25 +383,30 @@ struct EditorView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            Divider()
-
             if editorViewModel.currentFile == nil {
                 emptyStateView
             } else {
                 ZStack(alignment: .bottom) {
-                    CodeEditorView(
-                        text: $editorViewModel.content,
-                        fileType: editorViewModel.currentFile?.fileType ?? .plainText,
-                        isDarkMode: colorScheme == .dark
-                    )
+                    VStack(spacing: 0) {
+                        CodeEditorView(
+                            text: $editorViewModel.content,
+                            cursorLine: $cursorLine,
+                            cursorColumn: $cursorColumn,
+                            fileType: editorViewModel.currentFile?.fileType ?? .plainText,
+                            isDarkMode: colorScheme == .dark
+                        )
+
+                        statusBar
+                    }
                     if let msg = toastMessage {
                         toastView(message: msg)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
-                            .padding(.bottom, 16)
+                            .padding(.bottom, 44)
                     }
                 }
             }
         }
+        .background(Color.editorPanelBackground)
         .background(
             Button("") { Task { try? await editorViewModel.save() } }
                 .keyboardShortcut("s", modifiers: .command)
@@ -396,25 +437,79 @@ struct EditorView: View {
         }
         .onChange(of: editorViewModel.sourceResult) { _, result in
             guard let result else { return }
-            let msg = result.success ? "✓ source 执行成功" : "✗ source 失败：\(result.errorOutput)"
+            let msg = result.success ? "source 执行成功" : "source 失败：\(result.errorOutput)"
             showToast(msg)
+        }
+        .onChange(of: editorViewModel.currentFile) { _, _ in
+            cursorLine = 1
+            cursorColumn = 1
         }
     }
 
     private var emptyStateView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 14) {
             Image(systemName: "doc.text")
-                .font(.system(size: 48))
+                .font(.system(size: 44))
                 .foregroundStyle(.tertiary)
             Text("选择左侧文件开始编辑")
                 .font(.title3)
+                .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
             Text("从侧边栏选择一个配置文件")
                 .font(.callout)
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(NSColor.textBackgroundColor))
+        .background(Color.editorPanelBackground)
+    }
+
+    private var statusBar: some View {
+        HStack(spacing: 0) {
+            Spacer()
+
+            statusText("行 \(cursorLine), 列 \(cursorColumn)")
+            statusText("UTF-8")
+            statusText(fileTypeLabel)
+            statusText("LF")
+
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Color.green)
+                    .font(.system(size: 13))
+                Text("无语法错误")
+            }
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+        }
+        .frame(height: 31)
+        .background(Color.editorChromeBackground)
+        .overlay(Divider(), alignment: .top)
+    }
+
+    private func statusText(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .padding(.horizontal, 13)
+    }
+
+    private var fileTypeLabel: String {
+        switch editorViewModel.currentFile?.fileType ?? .plainText {
+        case .json:
+            return "JSON"
+        case .jsonc:
+            return "JSONC"
+        case .yaml:
+            return "YAML"
+        case .toml:
+            return "TOML"
+        case .shell:
+            return "Shell Script"
+        case .plainText:
+            return "Plain Text"
+        }
     }
 
     private func toastView(message: String) -> some View {
@@ -423,7 +518,7 @@ struct EditorView: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(Capsule().fill(Color.black.opacity(0.75)))
+            .background(Capsule().fill(Color(nsColor: .labelColor).opacity(0.78)))
     }
 
     private func showToast(_ message: String) {
@@ -436,6 +531,16 @@ struct EditorView: View {
                 withAnimation(.easeInOut(duration: 0.3)) { toastMessage = nil }
             }
         }
+    }
+}
+
+private extension Color {
+    static var editorPanelBackground: Color {
+        Color(nsColor: .textBackgroundColor)
+    }
+
+    static var editorChromeBackground: Color {
+        Color(nsColor: .windowBackgroundColor)
     }
 }
 

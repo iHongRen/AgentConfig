@@ -152,22 +152,16 @@ struct MainContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            // 左栏：分类列表
             SidebarView()
                 .environmentObject(appViewModel)
-        } content: {
-            // 中栏：文件列表
-            fileListContent
         } detail: {
-            // 右栏：编辑器
             EditorView(
                 editorViewModel: editorViewModel,
                 gitViewModel: gitViewModel
             )
         }
         .navigationSplitViewStyle(.balanced)
-        .frame(minWidth: 900, minHeight: 600)
-        // 当选中文件变化时，加载文件到编辑器
+        .frame(minWidth: 980, minHeight: 640)
         .onChange(of: appViewModel.selectedFile) { _, newFile in
             guard let file = newFile else { return }
             Task {
@@ -179,43 +173,5 @@ struct MainContentView: View {
         .onAppear {
             editorViewModel.autoSource = appViewModel.settings.autoSource
         }
-    }
-
-    // MARK: - File List Content
-
-    @ViewBuilder
-    private var fileListContent: some View {
-        if let selectedCategory = appViewModel.selectedCategory {
-            switch selectedCategory {
-            case .env:
-                if let envCategory = appViewModel.envCategory {
-                    FileListView(selection: .env(envCategory))
-                        .environmentObject(appViewModel)
-                } else {
-                    emptyFileListPlaceholder
-                }
-            case .agent(let id):
-                if let category = appViewModel.agentCategories.first(where: { $0.id == id }) {
-                    FileListView(selection: .agent(category))
-                        .environmentObject(appViewModel)
-                } else {
-                    emptyFileListPlaceholder
-                }
-            }
-        } else {
-            emptyFileListPlaceholder
-        }
-    }
-
-    private var emptyFileListPlaceholder: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "sidebar.left")
-                .font(.system(size: 36))
-                .foregroundStyle(.tertiary)
-            Text(NSLocalizedString("filelist.selectCategory", value: "Select a category from the sidebar", comment: "File list empty placeholder"))
-                .foregroundStyle(.secondary)
-                .font(.callout)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

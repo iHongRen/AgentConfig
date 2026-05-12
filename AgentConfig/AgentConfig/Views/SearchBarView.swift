@@ -29,6 +29,7 @@ struct SearchBarView: View {
 
     /// 搜索输入框焦点状态
     @FocusState private var isSearchFieldFocused: Bool
+    @State private var isRegexEnabled = false
 
     // MARK: - Computed Properties
 
@@ -54,43 +55,26 @@ struct SearchBarView: View {
 
     var body: some View {
         if isVisible {
-            HStack(spacing: 6) {
-                // 搜索输入框区域
-                HStack(spacing: 4) {
+            HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.secondary)
-                        .font(.system(size: 13))
+                        .font(.system(size: 15))
 
                     TextField(
                         NSLocalizedString("search.placeholder", comment: "搜索"),
                         text: $viewModel.searchQuery
                     )
                     .textFieldStyle(.plain)
-                    .font(.system(size: 13))
+                    .font(.system(size: 15, weight: .medium))
                     .focused($isSearchFieldFocused)
                     .onSubmit {
-                        // Enter 键跳转到下一个匹配项
                         viewModel.nextMatch()
                     }
                     .onChange(of: viewModel.searchQuery) { _, newValue in
                         viewModel.search(query: newValue, caseSensitive: viewModel.isCaseSensitive)
                     }
 
-                    // 匹配数量显示
-                    if !viewModel.searchQuery.isEmpty {
-                        Text(matchCountText)
-                            .font(.system(size: 11))
-                            .foregroundColor(hasNoMatch ? .white : .secondary)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(
-                                RoundedRectangle(cornerRadius: 3)
-                                    .fill(hasNoMatch ? Color.red : Color.clear)
-                            )
-                            .animation(.easeInOut(duration: 0.15), value: hasNoMatch)
-                    }
-
-                    // 清除按钮
                     if !viewModel.searchQuery.isEmpty {
                         Button {
                             viewModel.searchQuery = ""
@@ -98,86 +82,103 @@ struct SearchBarView: View {
                         } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundColor(.secondary)
-                                .font(.system(size: 12))
+                                .font(.system(size: 15))
                         }
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
+                .padding(.horizontal, 10)
                 .background(
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: 7)
                         .fill(Color(NSColor.textBackgroundColor))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: 7)
                                 .stroke(
                                     hasNoMatch ? Color.red : Color(NSColor.separatorColor),
                                     lineWidth: hasNoMatch ? 1.5 : 1
                                 )
                         )
                 )
-                .frame(minWidth: 200, maxWidth: 320)
+                .frame(width: 268, height: 34)
 
-                // 上一个按钮（Cmd+Shift+G）
-                Button {
-                    viewModel.previousMatch()
-                } label: {
-                    Image(systemName: "chevron.up")
-                        .font(.system(size: 12, weight: .medium))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(viewModel.searchResults.isEmpty)
-                .help(NSLocalizedString("search.previous", comment: "上一个匹配项"))
-                .keyboardShortcut("g", modifiers: [.command, .shift])
-
-                // 下一个按钮（Cmd+G）
-                Button {
-                    viewModel.nextMatch()
-                } label: {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 12, weight: .medium))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(viewModel.searchResults.isEmpty)
-                .help(NSLocalizedString("search.next", comment: "下一个匹配项"))
-                .keyboardShortcut("g", modifiers: .command)
-
-                // 大小写敏感开关
                 Toggle(isOn: $viewModel.isCaseSensitive) {
-                    Text(NSLocalizedString("search.case_sensitive", comment: "Aa"))
-                        .font(.system(size: 12, weight: .medium))
+                    Text("区分大小写")
+                        .font(.system(size: 13, weight: .medium))
                 }
-                .toggleStyle(.button)
+                .toggleStyle(.checkbox)
                 .controlSize(.small)
                 .help(NSLocalizedString("search.case_sensitive_tooltip", comment: "区分大小写"))
                 .onChange(of: viewModel.isCaseSensitive) { _, newValue in
                     viewModel.search(query: viewModel.searchQuery, caseSensitive: newValue)
                 }
 
+                Toggle(isOn: $isRegexEnabled) {
+                    Text("正则表达式")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .toggleStyle(.checkbox)
+                .controlSize(.small)
+                .disabled(true)
+                .help("当前搜索使用普通文本匹配")
+
                 Spacer()
 
-                // 关闭按钮
+                Text(matchCountText)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(hasNoMatch ? .white : .primary)
+                    .monospacedDigit()
+                    .padding(.horizontal, hasNoMatch ? 8 : 0)
+                    .padding(.vertical, hasNoMatch ? 3 : 0)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(hasNoMatch ? Color.red : Color.clear)
+                    )
+                    .frame(minWidth: 58)
+                    .animation(.easeInOut(duration: 0.15), value: hasNoMatch)
+
+                Button {
+                    viewModel.previousMatch()
+                } label: {
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 34, height: 30)
+                }
+                .buttonStyle(.bordered)
+                .disabled(viewModel.searchResults.isEmpty)
+                .help(NSLocalizedString("search.previous", comment: "上一个匹配项"))
+                .keyboardShortcut("g", modifiers: [.command, .shift])
+
+                Button {
+                    viewModel.nextMatch()
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 34, height: 30)
+                }
+                .buttonStyle(.bordered)
+                .disabled(viewModel.searchResults.isEmpty)
+                .help(NSLocalizedString("search.next", comment: "下一个匹配项"))
+                .keyboardShortcut("g", modifiers: .command)
+
                 Button {
                     closeSearchBar()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 18, weight: .medium))
+                        .frame(width: 30, height: 30)
                 }
                 .buttonStyle(.plain)
                 .foregroundColor(.secondary)
                 .help(NSLocalizedString("search.close", comment: "关闭搜索栏"))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Color(NSColor.windowBackgroundColor).opacity(0.95))
+            .frame(height: 60)
+            .padding(.horizontal, 16)
+            .background(Color(NSColor.windowBackgroundColor))
             .overlay(
                 Divider(),
                 alignment: .bottom
             )
             .onAppear {
-                // 搜索栏出现时自动聚焦输入框
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     isSearchFieldFocused = true
                 }

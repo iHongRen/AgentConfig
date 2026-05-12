@@ -30,6 +30,9 @@ struct EditorToolbarView: View {
 
     // MARK: - Callbacks
 
+    /// 点击搜索按钮时的回调
+    var onShowSearch: (() -> Void)?
+
     /// 点击"历史记录"按钮时的回调
     var onShowHistory: (() -> Void)?
 
@@ -42,31 +45,27 @@ struct EditorToolbarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 主工具栏行
             HStack(spacing: 8) {
-                // 文件名（有未保存修改时显示"●"标记）
-                fileNameLabel
+                tabView
 
                 Spacer()
 
-                // 格式化按钮（仅 JSON/JSONC 文件显示）
+                searchButton
+
                 if isJSONFile {
                     formatButton
                 }
 
-                // 历史记录按钮（仅 Git 仓库文件显示）
                 if gitViewModel.isGitRepo {
                     historyButton
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Color(NSColor.windowBackgroundColor))
+            .frame(height: 39)
+            .padding(.horizontal, 10)
+            .background(Color.editorToolbarBackground)
 
-            // 分隔线
             Divider()
 
-            // 格式化错误提示（格式化失败时内联显示）
             if let error = formatError {
                 formatErrorBanner(error: error)
             }
@@ -75,20 +74,44 @@ struct EditorToolbarView: View {
 
     // MARK: - Subviews
 
-    /// 文件名标签，有未保存修改时前缀"●"
-    private var fileNameLabel: some View {
-        HStack(spacing: 4) {
-            if editorViewModel.isModified {
-                Text("●")
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
-            }
+    private var tabView: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "doc.text")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+
             Text(currentFileName)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.primary)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.primary)
                 .lineLimit(1)
                 .truncationMode(.middle)
+
+            if editorViewModel.isModified {
+                Circle()
+                    .fill(Color(nsColor: .secondaryLabelColor))
+                    .frame(width: 8, height: 8)
+            }
         }
+        .padding(.horizontal, 13)
+        .frame(height: 39)
+        .frame(minWidth: 168, idealWidth: 220, maxWidth: 280, alignment: .leading)
+        .background(
+            Rectangle()
+                .fill(Color.editorTabBackground)
+        )
+        .overlay(Divider(), alignment: .trailing)
+    }
+
+    private var searchButton: some View {
+        Button {
+            onShowSearch?()
+        } label: {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 13, weight: .medium))
+        }
+        .buttonStyle(.borderless)
+        .controlSize(.small)
+        .help("搜索")
     }
 
     /// 格式化按钮
@@ -96,13 +119,10 @@ struct EditorToolbarView: View {
         Button {
             performFormat()
         } label: {
-            Label(
-                NSLocalizedString("toolbar.format", value: "格式化", comment: "Format JSON button"),
-                systemImage: "text.alignleft"
-            )
-            .font(.system(size: 12))
+            Image(systemName: "text.alignleft")
+                .font(.system(size: 13, weight: .medium))
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.borderless)
         .controlSize(.small)
         .help(NSLocalizedString("toolbar.format.help", value: "将 JSON 内容格式化为 2 空格缩进", comment: "Format button tooltip"))
     }
@@ -112,13 +132,10 @@ struct EditorToolbarView: View {
         Button {
             onShowHistory?()
         } label: {
-            Label(
-                NSLocalizedString("toolbar.history", value: "历史记录", comment: "Git history button"),
-                systemImage: "clock.arrow.circlepath"
-            )
-            .font(.system(size: 12))
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 13, weight: .medium))
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.borderless)
         .controlSize(.small)
         .help(NSLocalizedString("toolbar.history.help", value: "查看 Git 提交历史", comment: "History button tooltip"))
     }
@@ -236,7 +253,18 @@ private struct FormatErrorInfo: Equatable {
     return EditorToolbarView(
         editorViewModel: editorVM,
         gitViewModel: gitVM,
+        onShowSearch: {},
         onShowHistory: { print("Show history") }
     )
     .frame(width: 600)
+}
+
+private extension Color {
+    static var editorToolbarBackground: Color {
+        Color(nsColor: .windowBackgroundColor)
+    }
+
+    static var editorTabBackground: Color {
+        Color(nsColor: .textBackgroundColor)
+    }
 }

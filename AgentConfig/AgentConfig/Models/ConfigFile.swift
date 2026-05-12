@@ -89,3 +89,18 @@ struct EnvCategory: Equatable {
     /// 不存在但可创建的路径
     let missingPaths: [URL]
 }
+
+// MARK: - CustomPathGroup
+
+/// 用户添加的自定义路径分组。路径可以是单个文件，也可以是目录。
+struct CustomPathGroup: Identifiable, Equatable {
+    let id: String
+    let url: URL
+    let files: [ConfigFile]
+
+    init(url: URL, files: [ConfigFile]) {
+        self.id = url.standardizedFileURL.path
+        self.url = url
+        self.files = files
+    }
+}

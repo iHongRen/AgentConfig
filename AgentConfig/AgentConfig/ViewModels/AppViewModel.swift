@@ -35,6 +35,9 @@ final class AppViewModel: ObservableObject {
     /// 已检测到的 Agent 配置文件分类列表
     @Published var agentCategories: [AgentCategory] = []
 
+    /// 用户添加的自定义路径分组列表
+    @Published var customPathGroups: [CustomPathGroup] = []
+
     /// 当前选中的配置文件
     @Published var selectedFile: ConfigFile?
 
@@ -85,6 +88,7 @@ final class AppViewModel: ObservableObject {
         let (agents, env) = await (agentResult, envResult)
         agentCategories = agents
         envCategory = env
+        customPathGroups = scanCustomPaths()
     }
 
     /// 添加用户自定义配置文件路径
@@ -134,6 +138,67 @@ final class AppViewModel: ObservableObject {
         UserDefaults.standard.synchronize()
         // 发送通知触发 UI 重建（由 AgentConfigApp 监听）
         NotificationCenter.default.post(name: .languageDidChange, object: nil)
+    }
+
+    // MARK: - Custom Paths
+
+    private func scanCustomPaths() -> [CustomPathGroup] {
+        let fileManager = FileManager.default
+
+        return settings.customPaths.compactMap { url in
+            let standardizedURL = url.standardizedFileURL
+            var isDirectory: ObjCBool = false
+
+            guard fileManager.fileExists(atPath: standardizedURL.path, isDirectory: &isDirectory) else {
+                return nil
+            }
+
+            if isDirectory.boolValue {
+                let files = enumerateFiles(in: standardizedURL, maxDepth: 2)
+                return CustomPathGroup(url: standardizedURL, files: files.map { ConfigFile(url: $0) })
+            }
+
+            return CustomPathGroup(url: standardizedURL, files: [ConfigFile(url: standardizedURL)])
+        }
+    }
+
+    private func enumerateFiles(in directory: URL, maxDepth: Int) -> [URL] {
+        var result: [URL] = []
+        enumerateFilesRecursive(in: directory, currentDepth: 1, maxDepth: maxDepth, result: &result)
+        return result
+    }
+
+    private func enumerateFilesRecursive(
+        in directory: URL,
+        currentDepth: Int,
+        maxDepth: Int,
+        result: inout [URL]
+    ) {
+        guard currentDepth <= maxDepth else { return }
+
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+
+        for itemURL in contents.sorted(by: { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }) {
+            var isDirectory: ObjCBool = false
+            FileManager.default.fileExists(atPath: itemURL.path, isDirectory: &isDirectory)
+
+            if isDirectory.boolValue {
+                if currentDepth < maxDepth {
+                    enumerateFilesRecursive(
+                        in: itemURL,
+                        currentDepth: currentDepth + 1,
+                        maxDepth: maxDepth,
+                        result: &result
+                    )
+                }
+            } else {
+                result.append(itemURL)
+            }
+        }
     }
 }
 
