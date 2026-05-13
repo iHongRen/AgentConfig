@@ -18,6 +18,21 @@ struct SidebarView: View {
     @State private var isEnvExpanded = true
     @State private var expandedAgentIDs: Set<String> = []
     @State private var expandedCustomPathIDs: Set<String> = []
+    @State private var deleteTarget: DeleteTarget?
+
+    enum DeleteTarget: Identifiable {
+        case customPath(URL)
+        case fileInCustomPath(URL, groupURL: URL)
+        case hideFile(URL)
+
+        var id: String {
+            switch self {
+            case .customPath(let url): return "path-\(url.absoluteString)"
+            case .fileInCustomPath(let url, _): return "file-\(url.absoluteString)"
+            case .hideFile(let url): return "hide-\(url.absoluteString)"
+            }
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -74,6 +89,38 @@ struct SidebarView: View {
         .onChange(of: appViewModel.agentCategories) { _, _ in }
         .onChange(of: appViewModel.customPathGroups) { _, groups in
             expandedCustomPathIDs.formUnion(groups.map(\.id))
+        }
+        .alert(item: $deleteTarget) { target in
+            switch target {
+            case .customPath(let url):
+                return Alert(
+                    title: Text("确定要删除吗？"),
+                    message: Text("将从列表中移除此路径及其下所有文件：\n\(url.path)"),
+                    primaryButton: .destructive(Text("删除")) {
+                        appViewModel.removeCustomPath(url)
+                    },
+                    secondaryButton: .cancel()
+                )
+            case .fileInCustomPath(let url, let groupURL):
+                return Alert(
+                    title: Text("确定要删除吗？"),
+                    message: Text("将删除文件：\n\(url.path)"),
+                    primaryButton: .destructive(Text("删除")) {
+                        deleteFileAndRefresh(url)
+                        appViewModel.removeCustomPath(groupURL)
+                    },
+                    secondaryButton: .cancel()
+                )
+            case .hideFile(let url):
+                return Alert(
+                    title: Text("从列表移除？"),
+                    message: Text("将从侧边栏移除此文件，但不会删除实际文件。\n\(url.path)"),
+                    primaryButton: .default(Text("移除")) {
+                        appViewModel.hideFile(url)
+                    },
+                    secondaryButton: .cancel(Text("取消"))
+                )
+            }
         }
     }
 
@@ -233,6 +280,36 @@ struct SidebarView: View {
             }
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            fileContextMenu(for: file)
+        }
+    }
+
+    @ViewBuilder
+    private func fileContextMenu(for file: ConfigFile) -> some View {
+        Button("在 Finder 中打开") {
+            NSWorkspace.shared.activateFileViewerSelecting([file.url])
+        }
+
+        Button("在 VSCode 中打开") {
+            let task = Process()
+            task.launchPath = "/usr/local/bin/code"
+            task.arguments = [file.url.path]
+            task.launch()
+        }
+
+        Divider()
+
+        Button("复制路径") {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(file.url.path, forType: .string)
+        }
+
+        Divider()
+
+        Button("从列表移除") {
+            deleteTarget = .hideFile(file.url)
+        }
     }
 
     private func missingFileRow(_ url: URL) -> some View {
@@ -259,6 +336,12 @@ struct SidebarView: View {
         .padding(.leading, 34)
         .padding(.trailing, 8)
         .padding(.vertical, 5)
+        .contextMenu {
+            Button("复制路径") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(url.path, forType: .string)
+            }
+        }
     }
 
     private func bindingForAgent(_ id: String) -> Binding<Bool> {
@@ -378,6 +461,14 @@ struct SidebarView: View {
         }
     }
 
+    private func deleteFileAndRefresh(_ url: URL) {
+        Task {
+            let fileService = FileService()
+            try? await fileService.delete(at: url)
+            await appViewModel.refresh()
+        }
+    }
+
     private func openFilePicker() {
         let panel = NSOpenPanel()
         panel.title = "选择配置文件或目录"
@@ -397,7 +488,7 @@ struct SidebarView: View {
 
 // MARK: - SidebarDisclosureSection
 
-private struct SidebarDisclosureSection<Content: View>: View {
+private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
 
     let title: String
     let count: Int
@@ -405,6 +496,25 @@ private struct SidebarDisclosureSection<Content: View>: View {
     let iconColor: Color
     @Binding var isExpanded: Bool
     @ViewBuilder let content: () -> Content
+    @ViewBuilder let contextMenu: (() -> Menu)?
+
+    init(
+        title: String,
+        count: Int,
+        icon: String,
+        iconColor: Color,
+        isExpanded: Binding<Bool>,
+        @ViewBuilder content: @escaping () -> Content,
+        @ViewBuilder contextMenu: @escaping () -> Menu = { EmptyView() }
+    ) {
+        self.title = title
+        self.count = count
+        self.icon = icon
+        self.iconColor = iconColor
+        self._isExpanded = isExpanded
+        self.content = content
+        self.contextMenu = contextMenu
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -442,6 +552,9 @@ private struct SidebarDisclosureSection<Content: View>: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .contextMenu {
+                contextMenu?()
+            }
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 1) {

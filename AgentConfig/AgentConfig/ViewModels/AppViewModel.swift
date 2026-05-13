@@ -86,9 +86,40 @@ final class AppViewModel: ObservableObject {
         async let envResult = scanner.scanEnvFiles()
 
         let (agents, env) = await (agentResult, envResult)
-        agentCategories = agents
-        envCategory = env
-        customPathGroups = scanCustomPaths()
+        agentCategories = filterHiddenFiles(from: agents)
+        envCategory = filterHiddenFiles(from: env)
+        customPathGroups = filterHiddenFiles(from: scanCustomPaths())
+    }
+
+    // MARK: - Hidden Files Filtering
+
+    /// 过滤掉被隐藏的文件
+    private func filterHiddenFiles(from categories: [AgentCategory]) -> [AgentCategory] {
+        categories.map { category in
+            AgentCategory(
+                id: category.id,
+                displayName: category.displayName,
+                files: category.files.filter { !isFileHidden($0.url) },
+                missingPaths: category.missingPaths.filter { !isFileHidden($0) }
+            )
+        }
+    }
+
+    private func filterHiddenFiles(from envCategory: EnvCategory?) -> EnvCategory? {
+        guard let env = envCategory else { return nil }
+        return EnvCategory(
+            files: env.files.filter { !isFileHidden($0.url) },
+            missingPaths: env.missingPaths.filter { !isFileHidden($0) }
+        )
+    }
+
+    private func filterHiddenFiles(from groups: [CustomPathGroup]) -> [CustomPathGroup] {
+        groups.compactMap { group in
+            let filteredFiles = group.files.filter { !isFileHidden($0.url) }
+            // 如果过滤后没有文件了，返回 nil（不显示空分组）
+            guard !filteredFiles.isEmpty else { return nil }
+            return CustomPathGroup(url: group.url, files: filteredFiles)
+        }
     }
 
     /// 添加用户自定义配置文件路径
@@ -100,6 +131,42 @@ final class AppViewModel: ObservableObject {
         settings.customPaths.append(url)
         settings.save()
         Task { await refresh() }
+    }
+
+    /// 移除用户自定义路径（单个文件或目录）
+    func removeCustomPath(_ url: URL) {
+        settings.customPaths.removeAll { $0.standardizedFileURL == url.standardizedFileURL }
+        settings.save()
+        Task { await refresh() }
+    }
+
+    /// 从列表中隐藏文件（不从磁盘删除，下次扫描不再显示）
+    /// - Parameter url: 要隐藏的文件路径
+    func hideFile(_ url: URL) {
+        let standardizedURL = url.standardizedFileURL
+        guard !settings.hiddenFilePaths.contains(where: { $0.standardizedFileURL == standardizedURL }) else { return }
+        settings.hiddenFilePaths.append(standardizedURL)
+        settings.save()
+        // 如果当前选中的是被隐藏的文件，清除选择
+        if selectedFile?.url.standardizedFileURL == standardizedURL {
+            selectedFile = nil
+        }
+        Task { await refresh() }
+    }
+
+    /// 恢复显示被隐藏的文件
+    /// - Parameter url: 要恢复显示的文件路径
+    func unhideFile(_ url: URL) {
+        settings.hiddenFilePaths.removeAll { $0.standardizedFileURL == url.standardizedFileURL }
+        settings.save()
+        Task { await refresh() }
+    }
+
+    /// 检查文件是否被隐藏
+    /// - Parameter url: 文件路径
+    /// - Returns: 是否被隐藏
+    func isFileHidden(_ url: URL) -> Bool {
+        settings.hiddenFilePaths.contains(where: { $0.standardizedFileURL == url.standardizedFileURL })
     }
 
     /// 更新应用设置（供设置页面调用）

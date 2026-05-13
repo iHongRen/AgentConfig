@@ -33,6 +33,11 @@ protocol FileServiceProtocol {
     /// - Parameter url: 文件路径
     /// - Returns: 最后修改时间，文件不存在时返回 nil
     func modificationDate(of url: URL) -> Date?
+
+    /// 删除文件
+    /// - Parameter url: 文件路径
+    /// - Throws: `AppError.fileWriteFailed` 删除失败时
+    func delete(at url: URL) async throws
 }
 
 // MARK: - FileService
@@ -90,5 +95,13 @@ final class FileService: FileServiceProtocol {
 
     func modificationDate(of url: URL) -> Date? {
         try? fileManager.attributesOfItem(atPath: url.path)[.modificationDate] as? Date
+    }
+
+    func delete(at url: URL) async throws {
+        do {
+            try fileManager.removeItem(at: url)
+        } catch {
+            throw AppError.fileWriteFailed(url, error)
+        }
     }
 }

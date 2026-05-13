@@ -63,6 +63,9 @@ struct AppSettings: Codable {
     /// 用户手动添加的自定义配置文件路径
     var customPaths: [URL] = []
 
+    /// 用户从列表中隐藏的文件路径（不从实际磁盘删除）
+    var hiddenFilePaths: [URL] = []
+
     // MARK: - UserDefaults Key
 
     static let userDefaultsKey = "AppSettings"
