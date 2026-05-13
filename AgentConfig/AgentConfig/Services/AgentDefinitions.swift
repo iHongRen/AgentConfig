@@ -61,37 +61,23 @@ enum AgentDefinitions {
                 AgentConfigEntry(title: "settings.json", candidatePaths: [
                     "~/.claude/settings.json",
                     "~/.claude.json"
-                ]),
-                AgentConfigEntry("~/.claude/settings.local.json"),
-                AgentConfigEntry("~/.claude/CLAUDE.md"),
-                AgentConfigEntry("~/.claude/mcp.json")
+                ])
             ]
         ),
         AgentDefinition(
             id: "qwen",
             displayName: "Qwen Code",
             configFiles: [
-                AgentConfigEntry(title: "config.json", candidatePaths: [
-                    "~/.qwen/config.json",
-                    "~/.config/qwen/config.json"
-                ]),
-                AgentConfigEntry(title: "settings.json", candidatePaths: [
-                    "~/.qwen/settings.json",
-                    "~/.config/qwen/settings.json"
-                ])
+                AgentConfigEntry("~/.qwen/oauth_creds.json"),
+                AgentConfigEntry("~/.qwen/settings.json"),
             ]
         ),
         AgentDefinition(
             id: "codex",
-            displayName: "Codex CLI",
+            displayName: "Codex",
             configFiles: [
                 AgentConfigEntry("~/.codex/auth.json"),
-                AgentConfigEntry(title: "config.toml", candidatePaths: [
-                    "~/.codex/config.toml",
-                    "~/.config/codex/config.toml"
-                ]),
-                AgentConfigEntry("~/.codex/instructions.md"),
-                AgentConfigEntry("~/.codex/mcp.json")
+                AgentConfigEntry("~/.codex/config.toml")
             ]
         ),
         AgentDefinition(
