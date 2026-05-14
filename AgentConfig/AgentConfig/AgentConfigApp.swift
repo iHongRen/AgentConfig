@@ -24,14 +24,18 @@ extension Notification.Name {
     static let appDidBecomeActive = Notification.Name("AgentConfig.appDidBecomeActive")
 }
 
-// MARK: - SaveCoordinator
+// MARK: - CommandCoordinator
 
-/// 桥接 EditorView 的 save 回调到 app 级菜单命令
-final class SaveCoordinator: ObservableObject {
+/// 桥接 EditorView 的回调到 app 级菜单命令
+final class CommandCoordinator: ObservableObject {
     let objectWillChange = ObservableObjectPublisher()
     var onSave: () async -> Void = { }
+    var onToggleSearch: () -> Void = { }
     func save() {
         Task { await onSave() }
+    }
+    func toggleSearch() {
+        onToggleSearch()
     }
 }
 
@@ -49,7 +53,7 @@ struct AgentConfigApp: App {
     @StateObject private var appViewModel = AppViewModel()
     @StateObject private var editorViewModel = EditorViewModel()
     @StateObject private var gitViewModel = GitViewModel()
-    @StateObject private var saveCoordinator = SaveCoordinator()
+    @StateObject private var saveCoordinator = CommandCoordinator()
 
     // MARK: - Appearance
 
@@ -100,6 +104,13 @@ struct AgentConfigApp: App {
                     saveCoordinator.save()
                 }
                 .keyboardShortcut("s", modifiers: .command)
+            }
+            // MARK: Find Menu
+            CommandGroup(replacing: .newItem) {
+                Button("查找") {
+                    saveCoordinator.toggleSearch()
+                }
+                .keyboardShortcut("f", modifiers: .command)
             }
         }
 
@@ -170,7 +181,7 @@ struct MainContentView: View {
     @ObservedObject var appViewModel: AppViewModel
     @ObservedObject var editorViewModel: EditorViewModel
     @ObservedObject var gitViewModel: GitViewModel
-    @ObservedObject var saveCoordinator: SaveCoordinator
+    @ObservedObject var saveCoordinator: CommandCoordinator
 
     var body: some View {
         NavigationSplitView {

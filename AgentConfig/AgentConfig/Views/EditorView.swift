@@ -497,7 +497,7 @@ struct EditorView: View {
 
     @ObservedObject var editorViewModel: EditorViewModel
     @ObservedObject var gitViewModel: GitViewModel
-    @ObservedObject var saveCoordinator: SaveCoordinator
+    @ObservedObject var saveCoordinator: CommandCoordinator
 
     @Environment(\.colorScheme) var colorScheme
 
@@ -559,6 +559,11 @@ struct EditorView: View {
             saveCoordinator.onSave = { [weak editorViewModel = editorViewModel] in
                 guard let vm = editorViewModel else { return }
                 try? await vm.save()
+            }
+            saveCoordinator.onToggleSearch = { [self] in
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    isSearchBarVisible = true
+                }
             }
         }
         .sheet(isPresented: $isShowingHistory) {
