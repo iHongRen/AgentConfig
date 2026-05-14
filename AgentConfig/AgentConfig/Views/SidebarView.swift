@@ -147,6 +147,11 @@ struct SidebarView: View {
             ForEach(category.missingPaths, id: \.absoluteString) { missingURL in
                 missingFileRow(missingURL)
             }
+        } contextMenu: {
+            Button("在 Finder 中打开") {
+                let home = FileManager.default.homeDirectoryForCurrentUser
+                NSWorkspace.shared.activateFileViewerSelecting([home])
+            }
         }
     }
 
@@ -166,6 +171,15 @@ struct SidebarView: View {
                 ForEach(category.missingPaths, id: \.absoluteString) { missingURL in
                     missingFileRow(missingURL)
                 }
+            } contextMenu: {
+                Button("在 Finder 中打开") {
+                    let representativeURL = category.files.first?.url
+                        ?? category.missingPaths.first
+                    if let url = representativeURL {
+                        NSWorkspace.shared.activateFileViewerSelecting([url])
+                    }
+                }
+                .disabled(category.files.isEmpty && category.missingPaths.isEmpty)
             }
         }
     }
@@ -183,6 +197,16 @@ struct SidebarView: View {
                     ) {
                         ForEach(group.files) { file in
                             fileRow(file, showsPathHint: group.files.count <= 4)
+                        }
+                    } contextMenu: {
+                        Button("在 Finder 中打开") {
+                            NSWorkspace.shared.activateFileViewerSelecting([group.url])
+                        }
+
+                        Divider()
+
+                        Button("删除") {
+                            deleteTarget = .customPath(group.url)
                         }
                     }
                 }

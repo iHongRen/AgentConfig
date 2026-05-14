@@ -238,7 +238,11 @@ final class SyntaxHighlighter: NSObject, NSTextStorageDelegate {
                 let highlightRange = match.numberOfRanges > 1 ? match.range(at: 1) : match.range
                 guard isValid(highlightRange, in: source) else { continue }
 
-                if rule.color != commentColor && intersectsAnyStringRange(highlightRange, stringRanges: stringRanges) {
+                // 注释优先级最高，直接覆盖；键名颜色需要覆盖字符串颜色（key 本身就是字符串）；
+                // 其余规则（数字、布尔值）不应命中字符串内部，跳过相交范围。
+                let isKeyName = rule.color == keyNameColor
+                let isComment = rule.color == commentColor
+                if !isKeyName && !isComment && intersectsAnyStringRange(highlightRange, stringRanges: stringRanges) {
                     continue
                 }
 
