@@ -497,6 +497,7 @@ struct EditorView: View {
 
     @ObservedObject var editorViewModel: EditorViewModel
     @ObservedObject var gitViewModel: GitViewModel
+    @ObservedObject var saveCoordinator: SaveCoordinator
 
     @Environment(\.colorScheme) var colorScheme
 
@@ -554,18 +555,12 @@ struct EditorView: View {
             }
         }
         .background(Color.editorPanelBackground)
-        .background(
-            Button("") { Task { try? await editorViewModel.save() } }
-                .keyboardShortcut("s", modifiers: .command)
-                .hidden()
-        )
-        .background(
-            Button("") {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { isSearchBarVisible = true }
+        .onAppear {
+            saveCoordinator.onSave = { [weak editorViewModel = editorViewModel] in
+                guard let vm = editorViewModel else { return }
+                try? await vm.save()
             }
-            .keyboardShortcut("f", modifiers: .command)
-            .hidden()
-        )
+        }
         .sheet(isPresented: $isShowingHistory) {
             GitHistoryView(gitViewModel: gitViewModel)
         }

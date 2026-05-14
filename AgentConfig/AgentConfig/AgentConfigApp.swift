@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppKit
+import Combine
 
 // MARK: - AppDelegate
 
@@ -23,6 +24,17 @@ extension Notification.Name {
     static let appDidBecomeActive = Notification.Name("AgentConfig.appDidBecomeActive")
 }
 
+// MARK: - SaveCoordinator
+
+/// 桥接 EditorView 的 save 回调到 app 级菜单命令
+final class SaveCoordinator: ObservableObject {
+    let objectWillChange = ObservableObjectPublisher()
+    var onSave: () async -> Void = { }
+    func save() {
+        Task { await onSave() }
+    }
+}
+
 // MARK: - AgentConfigApp
 
 @main
@@ -37,6 +49,7 @@ struct AgentConfigApp: App {
     @StateObject private var appViewModel = AppViewModel()
     @StateObject private var editorViewModel = EditorViewModel()
     @StateObject private var gitViewModel = GitViewModel()
+    @StateObject private var saveCoordinator = SaveCoordinator()
 
     // MARK: - Appearance
 
@@ -54,7 +67,8 @@ struct AgentConfigApp: App {
             MainContentView(
                 appViewModel: appViewModel,
                 editorViewModel: editorViewModel,
-                gitViewModel: gitViewModel
+                gitViewModel: gitViewModel,
+                saveCoordinator: saveCoordinator
             )
             .id(languageChangeID)  // 语言切换时强制重建整个视图树
             .preferredColorScheme(preferredColorScheme)
@@ -79,6 +93,13 @@ struct AgentConfigApp: App {
                 Button(NSLocalizedString("menu.about", value: "About AgentConfig", comment: "About menu item")) {
                     showAboutWindow()
                 }
+            }
+            // MARK: Save Menu
+            CommandGroup(replacing: .saveItem) {
+                Button("保存") {
+                    saveCoordinator.save()
+                }
+                .keyboardShortcut("s", modifiers: .command)
             }
         }
 
@@ -149,6 +170,7 @@ struct MainContentView: View {
     @ObservedObject var appViewModel: AppViewModel
     @ObservedObject var editorViewModel: EditorViewModel
     @ObservedObject var gitViewModel: GitViewModel
+    @ObservedObject var saveCoordinator: SaveCoordinator
 
     var body: some View {
         NavigationSplitView {
@@ -157,7 +179,8 @@ struct MainContentView: View {
         } detail: {
             EditorView(
                 editorViewModel: editorViewModel,
-                gitViewModel: gitViewModel
+                gitViewModel: gitViewModel,
+                saveCoordinator: saveCoordinator
             )
         }
         .navigationSplitViewStyle(.balanced)

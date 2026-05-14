@@ -115,20 +115,10 @@ enum AgentDefinitions {
             displayName: "Windsurf",
             configFiles: [
                 AgentConfigEntry("~/Library/Application Support/Windsurf/User/settings.json"),
-                AgentConfigEntry("~/Library/Application Support/Windsurf/User/keybindings.json"),
-                AgentConfigEntry("~/Library/Application Support/Windsurf/User/mcp.json")
+                AgentConfigEntry("~/Library/Application Support/Windsurf/User/keybindings.json")
             ]
         ),
-        AgentDefinition(
-            id: "continue",
-            displayName: "Continue",
-            configFiles: [
-                AgentConfigEntry("~/.continue/config.json"),
-                AgentConfigEntry("~/.continue/config.yaml"),
-                AgentConfigEntry("~/.continue/prompts/chat.md"),
-                AgentConfigEntry("~/.continue/rules.md")
-            ]
-        ),
+
         AgentDefinition(
             id: "aider",
             displayName: "Aider",
@@ -157,19 +147,10 @@ enum AgentDefinitions {
             ]
         ),
         AgentDefinition(
-            id: "roo-code",
-            displayName: "Roo Code",
-            configFiles: [
-                AgentConfigEntry("~/Library/Application Support/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/mcp_settings.json"),
-                AgentConfigEntry("~/Library/Application Support/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/custom_instructions.md")
-            ]
-        ),
-        AgentDefinition(
             id: "kilocode",
             displayName: "Kilo Code",
             configFiles: [
                 AgentConfigEntry("~/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code/settings/mcp_settings.json"),
-                AgentConfigEntry("~/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code/settings/custom_instructions.md")
             ]
         ),
         AgentDefinition(
@@ -177,8 +158,6 @@ enum AgentDefinitions {
             displayName: "Trae",
             configFiles: [
                 AgentConfigEntry("~/Library/Application Support/Trae/User/settings.json"),
-                AgentConfigEntry("~/Library/Application Support/Trae/User/keybindings.json"),
-                AgentConfigEntry("~/Library/Application Support/Trae/User/mcp.json")
             ]
         ),
         AgentDefinition(
@@ -190,28 +169,10 @@ enum AgentDefinitions {
             ]
         ),
         AgentDefinition(
-            id: "amazonq",
-            displayName: "Amazon Q",
-            configFiles: [
-                AgentConfigEntry("~/.aws/amazonq/settings.json"),
-                AgentConfigEntry("~/.aws/amazonq/mcp.json"),
-                AgentConfigEntry("~/.aws/amazonq/cli.json")
-            ]
-        ),
-        AgentDefinition(
             id: "augment",
             displayName: "Augment",
             configFiles: [
                 AgentConfigEntry("~/Library/Application Support/Augment/User/settings.json"),
-                AgentConfigEntry("~/Library/Application Support/Augment/User/mcp.json")
-            ]
-        ),
-        AgentDefinition(
-            id: "boltai",
-            displayName: "BoltAI",
-            configFiles: [
-                AgentConfigEntry("~/Library/Application Support/BoltAI/settings.json"),
-                AgentConfigEntry("~/Library/Application Support/BoltAI/prompts.json")
             ]
         )
     ]
