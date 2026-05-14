@@ -53,7 +53,6 @@ struct SidebarView: View {
                 .padding(.bottom, 16)
             }
 
-            selectionFooter
         }
         .frame(minWidth: 260, idealWidth: 292, maxWidth: 360)
         .background(Color.agentSidebarBackground)
@@ -237,19 +236,6 @@ struct SidebarView: View {
         .padding(.top, 6)
     }
 
-    private var selectionFooter: some View {
-        HStack(spacing: 8) {
-            Text(appViewModel.selectedFile == nil ? "未选择文件" : "已选择 1 个文件")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-
-            Spacer()
-        }
-        .padding(.horizontal, 20)
-        .frame(height: 32)
-        .background(Color.agentSidebarBackground)
-        .overlay(Divider(), alignment: .top)
-    }
 
     private func fileRow(_ file: ConfigFile, showsPathHint: Bool = false) -> some View {
         Button {

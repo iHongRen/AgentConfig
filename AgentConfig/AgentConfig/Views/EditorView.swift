@@ -122,6 +122,11 @@ struct CodeEditorView: NSViewRepresentable {
     var fileType: FileType
     var isDarkMode: Bool
 
+    // 搜索高亮
+    var searchResults: [NSRange]
+    var currentSearchIndex: Int
+    var scrollRevision: Int
+
     // MARK: Coordinator
 
     final class Coordinator: NSObject, NSTextViewDelegate {
@@ -132,6 +137,9 @@ struct CodeEditorView: NSViewRepresentable {
         var lastHighlightedIsDarkMode: Bool?
         var highlighter: SyntaxHighlighter?
         var isComposingMarkedText = false
+        var lastScrollRevision: Int = -1
+        /// 语法高亮完成后重新应用搜索背景色的回调（由 updateNSView 注入）
+        var reapplySearchHighlights: ((NSTextView) -> Void)?
 
         init(_ parent: CodeEditorView) {
             self.parent = parent
@@ -228,6 +236,9 @@ struct CodeEditorView: NSViewRepresentable {
                 return NSValue(range: NSRange(location: location, length: end - location))
             }
             updateCursorPosition(for: textView)
+
+            // 语法高亮完成后重新应用搜索背景色
+            reapplySearchHighlights?(textView)
         }
     }
 
@@ -398,6 +409,67 @@ struct CodeEditorView: NSViewRepresentable {
             ruler.refresh()
         }
         context.coordinator.updateCursorPosition(for: tv)
+
+        // 应用搜索高亮
+        applySearchHighlights(to: tv, context: context)
+
+        // 注入回调，确保语法高亮后搜索背景色不丢失
+        context.coordinator.reapplySearchHighlights = { [searchResults, currentSearchIndex] textView in
+            guard let storage = textView.textStorage else { return }
+            let fullRange = NSRange(location: 0, length: storage.length)
+            storage.removeAttribute(.backgroundColor, range: fullRange)
+            guard !searchResults.isEmpty else { return }
+            let allColor: NSColor = self.isDarkMode
+                ? NSColor(red: 0.80, green: 0.65, blue: 0.10, alpha: 0.45)
+                : NSColor(red: 0.98, green: 0.85, blue: 0.10, alpha: 0.55)
+            let currentColor: NSColor = self.isDarkMode
+                ? NSColor(red: 1.00, green: 0.75, blue: 0.00, alpha: 0.85)
+                : NSColor(red: 1.00, green: 0.72, blue: 0.00, alpha: 0.90)
+            storage.beginEditing()
+            for (i, range) in searchResults.enumerated() {
+                guard NSMaxRange(range) <= storage.length else { continue }
+                storage.addAttribute(.backgroundColor, value: i == currentSearchIndex ? currentColor : allColor, range: range)
+            }
+            storage.endEditing()
+        }
+    }
+
+    // MARK: - Search Highlight
+
+    private func applySearchHighlights(to tv: NSTextView, context: Context) {
+        guard let storage = tv.textStorage else { return }
+        let fullRange = NSRange(location: 0, length: storage.length)
+
+        // 先清除旧的搜索背景色
+        storage.removeAttribute(.backgroundColor, range: fullRange)
+
+        guard !searchResults.isEmpty else { return }
+
+        let allMatchColor: NSColor = isDarkMode
+            ? NSColor(red: 0.80, green: 0.65, blue: 0.10, alpha: 0.45)
+            : NSColor(red: 0.98, green: 0.85, blue: 0.10, alpha: 0.55)
+        let currentMatchColor: NSColor = isDarkMode
+            ? NSColor(red: 1.00, green: 0.75, blue: 0.00, alpha: 0.85)
+            : NSColor(red: 1.00, green: 0.72, blue: 0.00, alpha: 0.90)
+
+        storage.beginEditing()
+        for (i, range) in searchResults.enumerated() {
+            guard NSMaxRange(range) <= storage.length else { continue }
+            let color = i == currentSearchIndex ? currentMatchColor : allMatchColor
+            storage.addAttribute(.backgroundColor, value: color, range: range)
+        }
+        storage.endEditing()
+
+        // 滚动到当前匹配项（由 scrollRevision 驱动，避免每次 updateNSView 都滚动）
+        let lastRevision = context.coordinator.lastScrollRevision
+        if scrollRevision != lastRevision, currentSearchIndex < searchResults.count {
+            context.coordinator.lastScrollRevision = scrollRevision
+            let targetRange = searchResults[currentSearchIndex]
+            if NSMaxRange(targetRange) <= (tv.string as NSString).length {
+                tv.scrollRangeToVisible(targetRange)
+                tv.setSelectedRange(targetRange)
+            }
+        }
     }
 
     private var editorBackgroundColor: NSColor {
@@ -449,7 +521,10 @@ struct EditorView: View {
                             cursorLine: $cursorLine,
                             cursorColumn: $cursorColumn,
                             fileType: editorViewModel.currentFile?.fileType ?? .plainText,
-                            isDarkMode: colorScheme == .dark
+                            isDarkMode: colorScheme == .dark,
+                            searchResults: editorViewModel.searchResults,
+                            currentSearchIndex: editorViewModel.currentSearchIndex,
+                            scrollRevision: editorViewModel.scrollRevision
                         )
 
                         statusBar

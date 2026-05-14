@@ -317,6 +317,8 @@ final class EditorViewModel: ObservableObject {
         searchResults = results
         // 重置到第一个匹配项
         currentSearchIndex = results.isEmpty ? 0 : 0
+        // 触发滚动到第一个匹配项
+        if !results.isEmpty { scrollRevision += 1 }
         return results
     }
 
@@ -324,13 +326,18 @@ final class EditorViewModel: ObservableObject {
     func nextMatch() {
         guard !searchResults.isEmpty else { return }
         currentSearchIndex = (currentSearchIndex + 1) % searchResults.count
+        scrollRevision += 1
     }
 
     /// 跳转到上一个搜索匹配项
     func previousMatch() {
         guard !searchResults.isEmpty else { return }
         currentSearchIndex = (currentSearchIndex - 1 + searchResults.count) % searchResults.count
+        scrollRevision += 1
     }
+
+    /// 每次需要滚动到当前匹配项时递增，供 CodeEditorView 监听
+    @Published var scrollRevision: Int = 0
 
     // MARK: - JSON Formatting
 

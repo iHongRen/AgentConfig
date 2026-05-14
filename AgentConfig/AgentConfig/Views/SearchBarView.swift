@@ -9,193 +9,209 @@ import SwiftUI
 
 // MARK: - SearchBarView
 
-/// 搜索栏视图，支持关键词搜索、上一个/下一个导航、大小写敏感开关
-///
-/// - 通过 `isVisible` 绑定控制显示/隐藏
-/// - 绑定 `EditorViewModel` 的搜索相关属性
-/// - 支持 Escape 键关闭搜索栏
-/// - 无匹配时显示"未找到"提示（红色背景）
+/// VSCode 风格搜索栏：关键词高亮、上下导航、大小写开关
 struct SearchBarView: View {
 
-    // MARK: - Bindings
-
-    /// 控制搜索栏是否可见
     @Binding var isVisible: Bool
-
-    /// 绑定的 EditorViewModel
     @ObservedObject var viewModel: EditorViewModel
 
-    // MARK: - Private State
-
-    /// 搜索输入框焦点状态
     @FocusState private var isSearchFieldFocused: Bool
-    @State private var isRegexEnabled = false
 
-    // MARK: - Computed Properties
+    // MARK: - Computed
 
-    /// 是否有搜索词但无匹配结果
     private var hasNoMatch: Bool {
         !viewModel.searchQuery.isEmpty && viewModel.searchResults.isEmpty
     }
 
-    /// 匹配数量显示文字，如 "3/10" 或 "未找到"
     private var matchCountText: String {
-        if viewModel.searchQuery.isEmpty {
-            return ""
-        }
-        if viewModel.searchResults.isEmpty {
-            return NSLocalizedString("search.no_match", comment: "未找到")
-        }
-        let current = viewModel.searchResults.isEmpty ? 0 : viewModel.currentSearchIndex + 1
-        let total = viewModel.searchResults.count
-        return "\(current)/\(total)"
+        guard !viewModel.searchQuery.isEmpty else { return "" }
+        guard !viewModel.searchResults.isEmpty else { return "无结果" }
+        return "\(viewModel.currentSearchIndex + 1)/\(viewModel.searchResults.count)"
     }
 
     // MARK: - Body
 
     var body: some View {
-        if isVisible {
-            HStack(spacing: 10) {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.secondary)
-                        .font(.system(size: 15))
+        HStack(spacing: 6) {
 
-                    TextField(
-                        NSLocalizedString("search.placeholder", comment: "搜索"),
-                        text: $viewModel.searchQuery
-                    )
+            // ── 搜索输入框 ──────────────────────────────────────────
+            HStack(spacing: 0) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 30)
+
+                TextField("搜索", text: $viewModel.searchQuery)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 13))
                     .focused($isSearchFieldFocused)
-                    .onSubmit {
-                        viewModel.nextMatch()
-                    }
-                    .onChange(of: viewModel.searchQuery) { _, newValue in
-                        viewModel.search(query: newValue, caseSensitive: viewModel.isCaseSensitive)
+                    .onSubmit { viewModel.nextMatch() }
+                    .onChange(of: viewModel.searchQuery) { _, q in
+                        viewModel.search(query: q, caseSensitive: viewModel.isCaseSensitive)
                     }
 
-                    if !viewModel.searchQuery.isEmpty {
-                        Button {
-                            viewModel.searchQuery = ""
-                            viewModel.search(query: "", caseSensitive: viewModel.isCaseSensitive)
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.secondary)
-                                .font(.system(size: 15))
-                        }
-                        .buttonStyle(.plain)
+                // 匹配计数
+                if !viewModel.searchQuery.isEmpty {
+                    Text(matchCountText)
+                        .font(.system(size: 12, weight: .medium).monospacedDigit())
+                        .foregroundStyle(hasNoMatch ? Color(nsColor: .systemRed) : .secondary)
+                        .frame(minWidth: 44, alignment: .trailing)
+                        .padding(.trailing, 4)
+                }
+
+                // 清除按钮
+                if !viewModel.searchQuery.isEmpty {
+                    Button {
+                        viewModel.searchQuery = ""
+                        viewModel.search(query: "", caseSensitive: viewModel.isCaseSensitive)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.tertiary)
                     }
+                    .buttonStyle(.plain)
+                    .frame(width: 26)
                 }
-                .padding(.horizontal, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 7)
-                        .fill(Color(NSColor.textBackgroundColor))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 7)
-                                .stroke(
-                                    hasNoMatch ? Color.red : Color(NSColor.separatorColor),
-                                    lineWidth: hasNoMatch ? 1.5 : 1
-                                )
-                        )
-                )
-                .frame(width: 268, height: 34)
-
-                Toggle(isOn: $viewModel.isCaseSensitive) {
-                    Text("区分大小写")
-                        .font(.system(size: 13, weight: .medium))
-                }
-                .toggleStyle(.checkbox)
-                .controlSize(.small)
-                .help(NSLocalizedString("search.case_sensitive_tooltip", comment: "区分大小写"))
-                .onChange(of: viewModel.isCaseSensitive) { _, newValue in
-                    viewModel.search(query: viewModel.searchQuery, caseSensitive: newValue)
-                }
-
-                Toggle(isOn: $isRegexEnabled) {
-                    Text("正则表达式")
-                        .font(.system(size: 13, weight: .medium))
-                }
-                .toggleStyle(.checkbox)
-                .controlSize(.small)
-                .disabled(true)
-                .help("当前搜索使用普通文本匹配")
-
-                Spacer()
-
-                Text(matchCountText)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(hasNoMatch ? .white : .primary)
-                    .monospacedDigit()
-                    .padding(.horizontal, hasNoMatch ? 8 : 0)
-                    .padding(.vertical, hasNoMatch ? 3 : 0)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(hasNoMatch ? Color.red : Color.clear)
+            }
+            .frame(height: 26)
+            .padding(.trailing, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(Color(nsColor: .textBackgroundColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5)
+                            .strokeBorder(
+                                hasNoMatch
+                                    ? Color(nsColor: .systemRed).opacity(0.8)
+                                    : Color(nsColor: .separatorColor),
+                                lineWidth: hasNoMatch ? 1.5 : 1
+                            )
                     )
-                    .frame(minWidth: 58)
-                    .animation(.easeInOut(duration: 0.15), value: hasNoMatch)
-
-                Button {
-                    viewModel.previousMatch()
-                } label: {
-                    Image(systemName: "chevron.up")
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 34, height: 30)
-                }
-                .buttonStyle(.bordered)
-                .disabled(viewModel.searchResults.isEmpty)
-                .help(NSLocalizedString("search.previous", comment: "上一个匹配项"))
-                .keyboardShortcut("g", modifiers: [.command, .shift])
-
-                Button {
-                    viewModel.nextMatch()
-                } label: {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 34, height: 30)
-                }
-                .buttonStyle(.bordered)
-                .disabled(viewModel.searchResults.isEmpty)
-                .help(NSLocalizedString("search.next", comment: "下一个匹配项"))
-                .keyboardShortcut("g", modifiers: .command)
-
-                Button {
-                    closeSearchBar()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 18, weight: .medium))
-                        .frame(width: 30, height: 30)
-                }
-                .buttonStyle(.plain)
-                .foregroundColor(.secondary)
-                .help(NSLocalizedString("search.close", comment: "关闭搜索栏"))
-            }
-            .frame(height: 60)
-            .padding(.horizontal, 16)
-            .background(Color(NSColor.windowBackgroundColor))
-            .overlay(
-                Divider(),
-                alignment: .bottom
             )
-            .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    isSearchFieldFocused = true
-                }
+            .frame(width: 260)
+
+            // ── 选项按钮 ────────────────────────────────────────────
+            optionToggle(
+                icon: "textformat",
+                label: "Aa",
+                isOn: $viewModel.isCaseSensitive,
+                tooltip: "区分大小写 (⌥⌘C)"
+            )
+            .onChange(of: viewModel.isCaseSensitive) { _, v in
+                viewModel.search(query: viewModel.searchQuery, caseSensitive: v)
             }
-            .onKeyPress(.escape) {
-                closeSearchBar()
-                return .handled
+
+            optionToggle(
+                icon: "chevron.left.forwardslash.chevron.right",
+                label: ".*",
+                isOn: .constant(false),
+                tooltip: "使用正则表达式（暂不支持）",
+                disabled: true
+            )
+
+            Spacer(minLength: 8)
+
+            // ── 导航按钮 ────────────────────────────────────────────
+            HStack(spacing: 2) {
+                navButton(icon: "chevron.up", action: { viewModel.previousMatch() }, tooltip: "上一个 (⇧F3)")
+                    .disabled(viewModel.searchResults.isEmpty)
+                    .keyboardShortcut("g", modifiers: [.command, .shift])
+
+                navButton(icon: "chevron.down", action: { viewModel.nextMatch() }, tooltip: "下一个 (F3)")
+                    .disabled(viewModel.searchResults.isEmpty)
+                    .keyboardShortcut("g", modifiers: .command)
             }
-            .transition(.move(edge: .top).combined(with: .opacity))
+
+            // ── 关闭按钮 ────────────────────────────────────────────
+            Button { closeSearchBar() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("关闭 (Esc)")
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 40)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .overlay(Divider(), alignment: .bottom)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                isSearchFieldFocused = true
+            }
+        }
+        .onKeyPress(.escape) {
+            closeSearchBar()
+            return .handled
         }
     }
 
-    // MARK: - Private Methods
+    // MARK: - Sub-views
 
-    /// 关闭搜索栏并清空搜索状态
+    /// 选项切换按钮（Aa / .*）
+    @ViewBuilder
+    private func optionToggle(
+        icon: String,
+        label: String,
+        isOn: Binding<Bool>,
+        tooltip: String,
+        disabled: Bool = false
+    ) -> some View {
+        Button {
+            if !disabled { isOn.wrappedValue.toggle() }
+        } label: {
+            Text(label)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(
+                    disabled
+                        ? Color.secondary.opacity(0.4)
+                        : (isOn.wrappedValue ? Color.accentColor : Color.secondary)
+                )
+                .frame(width: 26, height: 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(isOn.wrappedValue && !disabled
+                              ? Color.accentColor.opacity(0.15)
+                              : Color.clear)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .strokeBorder(
+                            isOn.wrappedValue && !disabled
+                                ? Color.accentColor.opacity(0.4)
+                                : Color.clear,
+                            lineWidth: 1
+                        )
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .help(tooltip)
+    }
+
+    /// 上/下导航按钮
+    private func navButton(icon: String, action: @escaping () -> Void, tooltip: String) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 26, height: 26)
+                .contentShape(Rectangle())
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color(nsColor: .quaternaryLabelColor).opacity(0.01))
+                )
+        }
+        .buttonStyle(.plain)
+        .help(tooltip)
+    }
+
+    // MARK: - Actions
+
     private func closeSearchBar() {
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(.easeInOut(duration: 0.15)) {
             isVisible = false
         }
         viewModel.searchQuery = ""
@@ -215,19 +231,12 @@ struct SearchBarView: View {
             VStack(spacing: 0) {
                 SearchBarView(isVisible: $isVisible, viewModel: viewModel)
                 Spacer()
-                Button("Toggle Search Bar") {
-                    withAnimation {
-                        isVisible.toggle()
-                    }
-                }
-                .padding()
             }
-            .frame(width: 600, height: 300)
+            .frame(width: 700, height: 200)
             .onAppear {
                 viewModel.content = "Hello World\nhello swift\nHELLO MACOS"
             }
         }
     }
-
     return PreviewWrapper()
 }
