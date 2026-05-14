@@ -137,9 +137,13 @@ struct SearchBarView: View {
         .frame(height: 40)
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay(Divider(), alignment: .bottom)
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                isSearchFieldFocused = true
+        .onChange(of: isVisible) { _, visible in
+            if visible {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    isSearchFieldFocused = true
+                }
+            } else {
+                isSearchFieldFocused = false
             }
         }
         .onKeyPress(.escape) {
@@ -211,7 +215,7 @@ struct SearchBarView: View {
     // MARK: - Actions
 
     private func closeSearchBar() {
-        withAnimation(.easeInOut(duration: 0.15)) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
             isVisible = false
         }
         viewModel.searchQuery = ""

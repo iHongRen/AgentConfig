@@ -121,11 +121,11 @@ struct CodeEditorView: NSViewRepresentable {
     @Binding var cursorColumn: Int
     var fileType: FileType
     var isDarkMode: Bool
-
     // 搜索高亮
     var searchResults: [NSRange]
     var currentSearchIndex: Int
     var scrollRevision: Int
+    var isSearchBarVisible: Bool
 
     // MARK: Coordinator
 
@@ -138,6 +138,7 @@ struct CodeEditorView: NSViewRepresentable {
         var highlighter: SyntaxHighlighter?
         var isComposingMarkedText = false
         var lastScrollRevision: Int = -1
+        var lastSearchBarVisible: Bool = false
         /// 语法高亮完成后重新应用搜索背景色的回调（由 updateNSView 注入）
         var reapplySearchHighlights: ((NSTextView) -> Void)?
 
@@ -404,6 +405,19 @@ struct CodeEditorView: NSViewRepresentable {
         tv.insertionPointColor = textColor
         scrollView.backgroundColor = editorBackgroundColor
 
+        // 搜索栏显隐时，补偿滚动位置，避免文本内容视觉跳动
+        let searchVisibilityChanged = context.coordinator.lastSearchBarVisible != isSearchBarVisible
+        let newTopInset: CGFloat = isSearchBarVisible ? 54 : 14
+        tv.textContainerInset = NSSize(width: 16, height: newTopInset)
+        if searchVisibilityChanged {
+            let delta: CGFloat = isSearchBarVisible ? 40 : -40
+            var origin = scrollView.contentView.bounds.origin
+            origin.y = max(0, origin.y + delta)
+            scrollView.contentView.setBoundsOrigin(origin)
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+            context.coordinator.lastSearchBarVisible = isSearchBarVisible
+        }
+
         // 刷新行号
         if let ruler = scrollView.verticalRulerView as? LineNumberRulerView {
             ruler.refresh()
@@ -499,22 +513,17 @@ struct EditorView: View {
                 editorViewModel: editorViewModel,
                 gitViewModel: gitViewModel,
                 onShowSearch: {
-                    withAnimation(.easeInOut(duration: 0.16)) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                         isSearchBarVisible = true
                     }
                 },
                 onShowHistory: { isShowingHistory = true }
             )
 
-            if isSearchBarVisible {
-                SearchBarView(isVisible: $isSearchBarVisible, viewModel: editorViewModel)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
-
             if editorViewModel.currentFile == nil {
                 emptyStateView
             } else {
-                ZStack(alignment: .bottom) {
+                ZStack(alignment: .top) {
                     VStack(spacing: 0) {
                         CodeEditorView(
                             text: $editorViewModel.content,
@@ -524,11 +533,18 @@ struct EditorView: View {
                             isDarkMode: colorScheme == .dark,
                             searchResults: editorViewModel.searchResults,
                             currentSearchIndex: editorViewModel.currentSearchIndex,
-                            scrollRevision: editorViewModel.scrollRevision
+                            scrollRevision: editorViewModel.scrollRevision,
+                            isSearchBarVisible: isSearchBarVisible
                         )
 
                         statusBar
                     }
+
+                    SearchBarView(isVisible: $isSearchBarVisible, viewModel: editorViewModel)
+                        .offset(y: isSearchBarVisible ? 0 : -40)
+                        .opacity(isSearchBarVisible ? 1 : 0)
+                        .allowsHitTesting(isSearchBarVisible)
+
                     if let msg = toastMessage {
                         toastView(message: msg)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -545,7 +561,7 @@ struct EditorView: View {
         )
         .background(
             Button("") {
-                withAnimation(.easeInOut(duration: 0.2)) { isSearchBarVisible = true }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { isSearchBarVisible = true }
             }
             .keyboardShortcut("f", modifiers: .command)
             .hidden()
@@ -574,6 +590,7 @@ struct EditorView: View {
         .onChange(of: editorViewModel.currentFile) { _, _ in
             cursorLine = 1
             cursorColumn = 1
+            isSearchBarVisible = false
         }
     }
 
