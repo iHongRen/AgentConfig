@@ -28,10 +28,15 @@ struct EditorToolbarView: View {
     /// Git ViewModel，提供 Git 仓库状态
     @ObservedObject var gitViewModel: GitViewModel
 
+    var isExamplesVisible: Bool = false
+    var hasExamples: Bool = false
+
     // MARK: - Callbacks
 
     /// 点击搜索按钮时的回调
     var onShowSearch: (() -> Void)?
+
+    var onToggleExamples: (() -> Void)?
 
     /// 点击"历史记录"按钮时的回调
     var onShowHistory: (() -> Void)?
@@ -47,18 +52,22 @@ struct EditorToolbarView: View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 tabView
+                    .layoutPriority(0)
 
-                Spacer()
+                HStack(spacing: 8) {
+                    searchButton
+                    examplesButton
 
-                searchButton
+                    if isJSONFile {
+                        formatButton
+                    }
 
-                if isJSONFile {
-                    formatButton
+                    if gitViewModel.isGitRepo {
+                        historyButton
+                    }
                 }
-
-                if gitViewModel.isGitRepo {
-                    historyButton
-                }
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(2)
             }
             .frame(height: 39)
             .padding(.horizontal, 10)
@@ -94,7 +103,8 @@ struct EditorToolbarView: View {
         }
         .padding(.horizontal, 13)
         .frame(height: 39)
-        .frame(minWidth: 168, idealWidth: 220, maxWidth: 280, alignment: .leading)
+        .frame(minWidth: 0, idealWidth: 180, maxWidth: 280, alignment: .leading)
+        .clipped()
         .background(
             Rectangle()
                 .fill(Color.editorTabBackground)
@@ -103,15 +113,37 @@ struct EditorToolbarView: View {
     }
 
     private var searchButton: some View {
-        Button {
+        toolbarIconButton(systemName: "magnifyingglass", isActive: false) {
             onShowSearch?()
-        } label: {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 13, weight: .medium))
         }
-        .buttonStyle(.borderless)
-        .controlSize(.small)
         .help("搜索")
+    }
+
+    private var examplesButton: some View {
+        toolbarIconButton(systemName: "sidebar.right", isActive: isExamplesVisible) {
+            onToggleExamples?()
+        }
+        .disabled(!hasExamples)
+        .opacity(hasExamples ? 1 : 0.45)
+        .help(hasExamples ? "显示配置示例" : "当前文件暂无示例")
+    }
+
+    private func toolbarIconButton(systemName: String, isActive: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(isActive ? Color.white : Color.primary)
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(isActive ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7)
+                        .strokeBorder(Color(nsColor: .separatorColor).opacity(isActive ? 0 : 0.8))
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     /// 格式化按钮
@@ -258,7 +290,9 @@ private struct FormatErrorInfo: Equatable {
     return EditorToolbarView(
         editorViewModel: editorVM,
         gitViewModel: gitVM,
+        hasExamples: true,
         onShowSearch: {},
+        onToggleExamples: {},
         onShowHistory: { print("Show history") }
     )
     .frame(width: 600)

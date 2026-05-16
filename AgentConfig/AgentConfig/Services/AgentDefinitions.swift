@@ -45,6 +45,13 @@ struct AgentDefinition {
     let configFiles: [AgentConfigEntry]
 }
 
+// MARK: - AgentConfigMatch
+
+struct AgentConfigMatch {
+    let definition: AgentDefinition
+    let entry: AgentConfigEntry
+}
+
 // MARK: - AgentDefinitions
 
 /// 所有已知 Code Agent 的静态路径配置表
@@ -55,21 +62,42 @@ enum AgentDefinitions {
     /// 所有已知 Agent 的定义列表（按字母顺序排列）
     static let all: [AgentDefinition] = [
         AgentDefinition(
-            id: "claude",
-            displayName: "Claude Code",
+            id: "aider",
+            displayName: "Aider",
             configFiles: [
-                AgentConfigEntry(title: "settings.json", candidatePaths: [
-                    "~/.claude/settings.json",
-                    "~/.claude.json"
-                ])
+                AgentConfigEntry("~/.aider.conf.yml"),
+                AgentConfigEntry("~/.aider.model.settings.yml")
             ]
         ),
         AgentDefinition(
-            id: "qwen",
-            displayName: "Qwen Code",
+            id: "amazonq",
+            displayName: "Amazon Q Developer",
             configFiles: [
-                AgentConfigEntry("~/.qwen/oauth_creds.json"),
-                AgentConfigEntry("~/.qwen/settings.json"),
+                AgentConfigEntry("~/.aws/config"),
+                AgentConfigEntry("~/.aws/credentials")
+            ]
+        ),
+        AgentDefinition(
+            id: "augment",
+            displayName: "Augment",
+            configFiles: [
+                AgentConfigEntry("~/.augment/settings.json")
+            ]
+        ),
+        AgentDefinition(
+            id: "claude",
+            displayName: "Claude Code",
+            configFiles: [
+                AgentConfigEntry("~/.claude/settings.json"),
+                AgentConfigEntry("~/.claude.json")
+            ]
+        ),
+        AgentDefinition(
+            id: "cline",
+            displayName: "Cline",
+            configFiles: [
+                AgentConfigEntry("~/.cline/data/settings/providers.json"),
+                AgentConfigEntry("~/.cline/data/settings/global-settings.json")
             ]
         ),
         AgentDefinition(
@@ -81,23 +109,12 @@ enum AgentDefinitions {
             ]
         ),
         AgentDefinition(
-            id: "opencode",
-            displayName: "OpenCode CLI",
+            id: "continue",
+            displayName: "Continue",
             configFiles: [
-                AgentConfigEntry(title: "config.json", candidatePaths: [
-                    "~/.opencode/config.json",
-                    "~/.config/opencode/config.json"
-                ]),
-                AgentConfigEntry("~/.opencode/config.toml"),
-                AgentConfigEntry("~/.opencode/agents.json")
-            ]
-        ),
-        AgentDefinition(
-            id: "github-copilot",
-            displayName: "GitHub Copilot",
-            configFiles: [
-                AgentConfigEntry("~/.config/github-copilot/settings.json"),
-                AgentConfigEntry("~/.config/github-copilot/mcp.json")
+                AgentConfigEntry("~/.continue/config.yaml"),
+                AgentConfigEntry("~/.continue/config.ts"),
+                AgentConfigEntry("~/.continue/.env")
             ]
         ),
         AgentDefinition(
@@ -105,74 +122,56 @@ enum AgentDefinitions {
             displayName: "Cursor",
             configFiles: [
                 AgentConfigEntry("~/Library/Application Support/Cursor/User/settings.json"),
-                AgentConfigEntry("~/Library/Application Support/Cursor/User/keybindings.json"),
-                AgentConfigEntry("~/Library/Application Support/Cursor/User/mcp.json"),
-                AgentConfigEntry("~/Library/Application Support/Cursor/User/snippets.json")
-            ]
-        ),
-        AgentDefinition(
-            id: "windsurf",
-            displayName: "Windsurf",
-            configFiles: [
-                AgentConfigEntry("~/Library/Application Support/Windsurf/User/settings.json"),
-                AgentConfigEntry("~/Library/Application Support/Windsurf/User/keybindings.json")
-            ]
-        ),
-
-        AgentDefinition(
-            id: "aider",
-            displayName: "Aider",
-            configFiles: [
-                AgentConfigEntry("~/.aider.conf.yml"),
-                AgentConfigEntry("~/.aider.model.settings.yml")
+                AgentConfigEntry("~/.cursor/cli-config.json")
             ]
         ),
         AgentDefinition(
             id: "gemini",
             displayName: "Gemini CLI",
             configFiles: [
-                AgentConfigEntry(title: "settings.json", candidatePaths: [
-                    "~/.gemini/settings.json",
-                    "~/.config/gemini/settings.json"
-                ]),
-                AgentConfigEntry("~/.gemini/config.json")
+                AgentConfigEntry("~/.gemini/settings.json")
             ]
         ),
         AgentDefinition(
-            id: "cline",
-            displayName: "Cline",
+            id: "github-copilot",
+            displayName: "GitHub Copilot",
             configFiles: [
-                AgentConfigEntry("~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"),
-                AgentConfigEntry("~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_custom_instructions.md")
+                AgentConfigEntry("~/Library/Application Support/Code/User/settings.json")
             ]
         ),
         AgentDefinition(
             id: "kilocode",
             displayName: "Kilo Code",
             configFiles: [
-                AgentConfigEntry("~/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code/settings/mcp_settings.json"),
+                AgentConfigEntry("~/.config/kilo/kilo.jsonc")
+            ]
+        ),
+        AgentDefinition(
+            id: "opencode",
+            displayName: "OpenCode CLI",
+            configFiles: [
+                AgentConfigEntry("~/.config/opencode/opencode.json")
+            ]
+        ),
+        AgentDefinition(
+            id: "qwen",
+            displayName: "Qwen Code",
+            configFiles: [
+                AgentConfigEntry("~/.qwen/settings.json")
             ]
         ),
         AgentDefinition(
             id: "trae",
             displayName: "Trae",
             configFiles: [
-                AgentConfigEntry("~/Library/Application Support/Trae/User/settings.json"),
+                AgentConfigEntry("~/Library/Application Support/Trae/User/settings.json")
             ]
         ),
         AgentDefinition(
-            id: "cody",
-            displayName: "Cody",
+            id: "windsurf",
+            displayName: "Windsurf",
             configFiles: [
-                AgentConfigEntry("~/.config/cody/config.json"),
-                AgentConfigEntry("~/.config/cody/mcp.json")
-            ]
-        ),
-        AgentDefinition(
-            id: "augment",
-            displayName: "Augment",
-            configFiles: [
-                AgentConfigEntry("~/Library/Application Support/Augment/User/settings.json"),
+                AgentConfigEntry("~/Library/Application Support/Windsurf/User/settings.json")
             ]
         )
     ]
@@ -182,5 +181,15 @@ enum AgentDefinitions {
     /// 根据 Agent ID 查找定义
     static func definition(for id: String) -> AgentDefinition? {
         all.first { $0.id == id }
+    }
+
+    static func match(for url: URL) -> AgentConfigMatch? {
+        let standardizedURL = url.standardizedFileURL
+        for definition in all {
+            for entry in definition.configFiles where entry.resolvedURLs.contains(where: { $0.standardizedFileURL == standardizedURL }) {
+                return AgentConfigMatch(definition: definition, entry: entry)
+            }
+        }
+        return nil
     }
 }
