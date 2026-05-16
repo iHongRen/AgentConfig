@@ -86,9 +86,84 @@ final class AppViewModel: ObservableObject {
         async let envResult = scanner.scanEnvFiles()
 
         let (agents, env) = await (agentResult, envResult)
-        agentCategories = filterHiddenFiles(from: agents)
-        envCategory = filterHiddenFiles(from: env)
+        agentCategories = filterHiddenFiles(from: mergeAddedFiles(into: agents))
+        envCategory = filterHiddenFiles(from: mergeAddedFiles(into: env))
         customPathGroups = filterHiddenFiles(from: scanCustomPaths())
+    }
+
+    // MARK: - Category Files
+
+    func addFiles(_ urls: [URL], to categoryKey: SidebarCategoryKey) {
+        let urlsToAdd = existingFileURLs(from: urls)
+        guard !urlsToAdd.isEmpty else { return }
+
+        let key = categoryKey.storageKey
+        var existingURLs = settings.categoryFilePaths[key] ?? []
+        for url in urlsToAdd where !existingURLs.contains(where: { $0.standardizedFileURL == url }) {
+            existingURLs.append(url)
+        }
+
+        settings.categoryFilePaths[key] = existingURLs
+        settings.hiddenFilePaths.removeAll { hiddenURL in
+            urlsToAdd.contains { $0.standardizedFileURL == hiddenURL.standardizedFileURL }
+        }
+        settings.save()
+        Task { await refresh() }
+    }
+
+    private func existingFileURLs(from urls: [URL]) -> [URL] {
+        var result: [URL] = []
+        for url in urls where url.isFileURL {
+            let standardizedURL = url.standardizedFileURL
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: standardizedURL.path, isDirectory: &isDirectory), !isDirectory.boolValue else {
+                continue
+            }
+            guard !result.contains(where: { $0.standardizedFileURL == standardizedURL }) else { continue }
+            result.append(standardizedURL)
+        }
+        return result
+    }
+
+    private func addedFiles(for categoryKey: SidebarCategoryKey) -> [ConfigFile] {
+        existingFileURLs(from: settings.categoryFilePaths[categoryKey.storageKey] ?? []).map { ConfigFile(url: $0) }
+    }
+
+    private func mergeAddedFiles(into categories: [AgentCategory]) -> [AgentCategory] {
+        let categoryIDs = Set(categories.map(\.id))
+        let mergedCategories = categories.map { category in
+            AgentCategory(
+                id: category.id,
+                displayName: category.displayName,
+                files: mergeFiles(category.files, with: addedFiles(for: .agent(id: category.id))),
+                missingPaths: category.missingPaths
+            )
+        }
+
+        let addedOnlyCategories = AgentDefinitions.all.compactMap { definition -> AgentCategory? in
+            guard !categoryIDs.contains(definition.id) else { return nil }
+            let files = addedFiles(for: .agent(id: definition.id))
+            guard !files.isEmpty else { return nil }
+            return AgentCategory(id: definition.id, displayName: definition.displayName, files: files, missingPaths: [])
+        }
+
+        return mergedCategories + addedOnlyCategories
+    }
+
+    private func mergeAddedFiles(into envCategory: EnvCategory?) -> EnvCategory? {
+        guard let envCategory else { return nil }
+        return EnvCategory(
+            files: mergeFiles(envCategory.files, with: addedFiles(for: .env)),
+            missingPaths: envCategory.missingPaths
+        )
+    }
+
+    private func mergeFiles(_ baseFiles: [ConfigFile], with addedFiles: [ConfigFile]) -> [ConfigFile] {
+        var result = baseFiles
+        for file in addedFiles where !result.contains(where: { $0.url.standardizedFileURL == file.url.standardizedFileURL }) {
+            result.append(file)
+        }
+        return result
     }
 
     // MARK: - Hidden Files Filtering
@@ -136,6 +211,7 @@ final class AppViewModel: ObservableObject {
     /// 移除用户自定义路径（单个文件或目录）
     func removeCustomPath(_ url: URL) {
         settings.customPaths.removeAll { $0.standardizedFileURL == url.standardizedFileURL }
+        settings.categoryFilePaths[SidebarCategoryKey.customPath(url).storageKey] = nil
         settings.save()
         Task { await refresh() }
     }
@@ -220,12 +296,13 @@ final class AppViewModel: ObservableObject {
                 return nil
             }
 
+            let addedFiles = addedFiles(for: .customPath(standardizedURL))
             if isDirectory.boolValue {
-                let files = enumerateFiles(in: standardizedURL, maxDepth: 2)
-                return CustomPathGroup(url: standardizedURL, files: files.map { ConfigFile(url: $0) })
+                let files = enumerateFiles(in: standardizedURL, maxDepth: 2).map { ConfigFile(url: $0) }
+                return CustomPathGroup(url: standardizedURL, files: mergeFiles(files, with: addedFiles))
             }
 
-            return CustomPathGroup(url: standardizedURL, files: [ConfigFile(url: standardizedURL)])
+            return CustomPathGroup(url: standardizedURL, files: mergeFiles([ConfigFile(url: standardizedURL)], with: addedFiles))
         }
     }
 

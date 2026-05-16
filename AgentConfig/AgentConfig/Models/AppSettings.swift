@@ -66,6 +66,30 @@ struct AppSettings: Codable {
     /// 用户从列表中隐藏的文件路径（不从实际磁盘删除）
     var hiddenFilePaths: [URL] = []
 
+    /// 用户手动添加到指定分类的文件路径
+    var categoryFilePaths: [String: [URL]] = [:]
+
+    enum CodingKeys: String, CodingKey {
+        case autoSource
+        case appearanceMode
+        case language
+        case customPaths
+        case hiddenFilePaths
+        case categoryFilePaths
+    }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        autoSource = try container.decodeIfPresent(Bool.self, forKey: .autoSource) ?? true
+        appearanceMode = try container.decodeIfPresent(AppearanceMode.self, forKey: .appearanceMode) ?? .system
+        language = try container.decodeIfPresent(AppLanguage.self, forKey: .language) ?? .system
+        customPaths = try container.decodeIfPresent([URL].self, forKey: .customPaths) ?? []
+        hiddenFilePaths = try container.decodeIfPresent([URL].self, forKey: .hiddenFilePaths) ?? []
+        categoryFilePaths = try container.decodeIfPresent([String: [URL]].self, forKey: .categoryFilePaths) ?? [:]
+    }
+
     // MARK: - UserDefaults Key
 
     static let userDefaultsKey = "AppSettings"
