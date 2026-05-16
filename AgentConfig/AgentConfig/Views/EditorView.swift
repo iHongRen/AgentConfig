@@ -506,6 +506,7 @@ struct EditorView: View {
     @State private var isShowingHistory = false
     @State private var cursorLine = 1
     @State private var cursorColumn = 1
+    @State private var examplesPaneWidth: CGFloat = 340
     @State private var toastMessage: String? = nil
     @State private var toastTask: Task<Void, Never>? = nil
 
@@ -525,14 +526,14 @@ struct EditorView: View {
                     .frame(minWidth: 280)
 
                     if isExamplesPaneVisible {
-                        Divider()
+                        ResizableDivider(width: $examplesPaneWidth)
 
                         ConfigExamplesPaneView(
                             groups: exampleGroups,
                             file: editorViewModel.currentFile,
                             onCopy: copyExampleToClipboard
                         )
-                        .frame(width: 340)
+                        .frame(width: examplesPaneWidth)
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
                 }
@@ -740,6 +741,50 @@ struct EditorView: View {
                 withAnimation(.easeInOut(duration: 0.3)) { toastMessage = nil }
             }
         }
+    }
+}
+
+private struct ResizableDivider: View {
+    @Binding var width: CGFloat
+    @State private var dragStartWidth: CGFloat?
+    @State private var dragStartX: CGFloat?
+
+    var body: some View {
+        Rectangle()
+            .fill(Color.clear)
+            .frame(width: 12)
+            .overlay(
+                Rectangle()
+                    .fill(Color(nsColor: .separatorColor))
+                    .frame(width: 1)
+            )
+            .contentShape(Rectangle())
+            .transaction { transaction in
+                transaction.animation = nil
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                    .onChanged { value in
+                        if dragStartWidth == nil {
+                            dragStartWidth = width
+                            dragStartX = value.startLocation.x
+                        }
+                        guard let dragStartWidth, let dragStartX else { return }
+                        let proposedWidth = dragStartWidth - (value.location.x - dragStartX)
+                        width = min(max(proposedWidth, 260), 560)
+                    }
+                    .onEnded { _ in
+                        dragStartWidth = nil
+                        dragStartX = nil
+                    }
+            )
+            .onHover { isHovering in
+                if isHovering {
+                    NSCursor.resizeLeftRight.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
     }
 }
 

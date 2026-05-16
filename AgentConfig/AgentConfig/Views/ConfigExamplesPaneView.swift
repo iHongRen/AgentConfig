@@ -157,22 +157,22 @@ struct ConfigExamplesPaneView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                ScrollView(.horizontal) {
-                    Text(example.code)
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(.primary)
-                        .textSelection(.enabled)
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.examplesCodeBackground)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(Color(nsColor: .separatorColor).opacity(0.65))
-                )
+                Text(example.code)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(.primary)
+                    .textSelection(.enabled)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.examplesCodeBackground)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(Color(nsColor: .separatorColor).opacity(0.65))
+                    )
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)

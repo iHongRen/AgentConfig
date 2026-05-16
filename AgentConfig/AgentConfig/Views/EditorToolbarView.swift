@@ -54,6 +54,8 @@ struct EditorToolbarView: View {
                 tabView
                     .layoutPriority(0)
 
+                Spacer(minLength: 8)
+
                 HStack(spacing: 8) {
                     searchButton
                     examplesButton
@@ -148,27 +150,17 @@ struct EditorToolbarView: View {
 
     /// 格式化按钮
     private var formatButton: some View {
-        Button {
+        toolbarIconButton(systemName: "text.alignleft", isActive: false) {
             performFormat()
-        } label: {
-            Image(systemName: "text.alignleft")
-                .font(.system(size: 13, weight: .medium))
         }
-        .buttonStyle(.borderless)
-        .controlSize(.small)
         .help(NSLocalizedString("toolbar.format.help", value: "将 JSON 内容格式化为 4 空格缩进", comment: "Format button tooltip"))
     }
 
     /// 历史记录按钮
     private var historyButton: some View {
-        Button {
+        toolbarIconButton(systemName: "clock.arrow.circlepath", isActive: false) {
             onShowHistory?()
-        } label: {
-            Image(systemName: "clock.arrow.circlepath")
-                .font(.system(size: 13, weight: .medium))
         }
-        .buttonStyle(.borderless)
-        .controlSize(.small)
         .help(NSLocalizedString("toolbar.history.help", value: "查看 Git 提交历史", comment: "History button tooltip"))
     }
 
