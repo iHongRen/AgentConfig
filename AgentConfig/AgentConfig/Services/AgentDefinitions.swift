@@ -5,7 +5,7 @@
 //  Created by cxy on 2026/5/11.
 //
 
-import Foundation
+import SwiftUI
 
 // MARK: - AgentConfigEntry
 
@@ -43,6 +43,8 @@ struct AgentDefinition {
     let displayName: String
     /// Asset Catalog 中的图标名称，如 "ClaudeCode"
     let iconName: String
+    /// 侧边栏图标颜色
+    let iconColor: Color
     /// 该 Agent 应展示的可编辑配置文件列表
     let configFiles: [AgentConfigEntry]
 }
@@ -67,6 +69,7 @@ enum AgentDefinitions {
             id: "aider",
             displayName: "Aider",
             iconName: "Aider",
+            iconColor: Color(red: 0.06, green: 0.74, blue: 0.58),
             configFiles: [
                 AgentConfigEntry("~/.aider.conf.yml"),
                 AgentConfigEntry("~/.aider.model.settings.yml")
@@ -76,6 +79,7 @@ enum AgentDefinitions {
             id: "amazonq",
             displayName: "Amazon Q Developer",
             iconName: "AmazonQ",
+            iconColor: Color(red: 0.96, green: 0.72, blue: 0.10),
             configFiles: [
                 AgentConfigEntry("~/.aws/config"),
                 AgentConfigEntry("~/.aws/credentials")
@@ -85,6 +89,7 @@ enum AgentDefinitions {
             id: "augment",
             displayName: "Augment",
             iconName: "Augment",
+            iconColor: Color(red: 0.48, green: 0.33, blue: 0.93),
             configFiles: [
                 AgentConfigEntry("~/.augment/settings.json")
             ]
@@ -93,6 +98,7 @@ enum AgentDefinitions {
             id: "claude",
             displayName: "Claude Code",
             iconName: "ClaudeCode",
+            iconColor: Color(red: 0.95, green: 0.43, blue: 0.09),
             configFiles: [
                 AgentConfigEntry("~/.claude/settings.json"),
                 AgentConfigEntry("~/.claude.json")
@@ -102,6 +108,7 @@ enum AgentDefinitions {
             id: "cline",
             displayName: "Cline",
             iconName: "Cline",
+            iconColor: Color(red: 0.30, green: 0.55, blue: 0.96),
             configFiles: [
                 AgentConfigEntry("~/.cline/data/settings/providers.json"),
                 AgentConfigEntry("~/.cline/data/settings/global-settings.json")
@@ -111,6 +118,7 @@ enum AgentDefinitions {
             id: "codex",
             displayName: "Codex",
             iconName: "Codex",
+            iconColor: Color(nsColor: .labelColor),
             configFiles: [
                 AgentConfigEntry("~/.codex/auth.json"),
                 AgentConfigEntry("~/.codex/config.toml")
@@ -120,6 +128,7 @@ enum AgentDefinitions {
             id: "continue",
             displayName: "Continue",
             iconName: "Continue",
+            iconColor: Color(nsColor: .secondaryLabelColor),
             configFiles: [
                 AgentConfigEntry("~/.continue/config.yaml"),
                 AgentConfigEntry("~/.continue/config.ts"),
@@ -130,6 +139,7 @@ enum AgentDefinitions {
             id: "cursor",
             displayName: "Cursor",
             iconName: "Cursor",
+            iconColor: Color(nsColor: .controlTextColor),
             configFiles: [
                 AgentConfigEntry("~/Library/Application Support/Cursor/User/settings.json"),
                 AgentConfigEntry("~/.cursor/cli-config.json")
@@ -139,6 +149,7 @@ enum AgentDefinitions {
             id: "gemini",
             displayName: "Gemini CLI",
             iconName: "GeminiCLI",
+            iconColor: Color(red: 0.22, green: 0.40, blue: 0.92),
             configFiles: [
                 AgentConfigEntry("~/.gemini/settings.json")
             ]
@@ -147,6 +158,7 @@ enum AgentDefinitions {
             id: "github-copilot",
             displayName: "GitHub Copilot",
             iconName: "GitHubCopilot",
+            iconColor: Color(red: 0.18, green: 0.80, blue: 0.44),
             configFiles: [
                 AgentConfigEntry("~/Library/Application Support/Code/User/settings.json")
             ]
@@ -155,6 +167,7 @@ enum AgentDefinitions {
             id: "kilocode",
             displayName: "Kilo Code",
             iconName: "KiloCode",
+            iconColor: Color(red: 0.95, green: 0.55, blue: 0.15),
             configFiles: [
                 AgentConfigEntry("~/.config/kilo/kilo.jsonc")
             ]
@@ -163,6 +176,7 @@ enum AgentDefinitions {
             id: "opencode",
             displayName: "OpenCode CLI",
             iconName: "OpenCodeCLI",
+            iconColor: Color(red: 0.25, green: 0.55, blue: 0.85),
             configFiles: [
                 AgentConfigEntry("~/.config/opencode/opencode.json")
             ]
@@ -171,6 +185,7 @@ enum AgentDefinitions {
             id: "qwen",
             displayName: "Qwen Code",
             iconName: "QwenCode",
+            iconColor: Color(red: 0.50, green: 0.20, blue: 0.90),
             configFiles: [
                 AgentConfigEntry("~/.qwen/settings.json")
             ]
@@ -179,6 +194,7 @@ enum AgentDefinitions {
             id: "trae",
             displayName: "Trae",
             iconName: "Trae",
+            iconColor: Color(red: 0.20, green: 0.60, blue: 0.95),
             configFiles: [
                 AgentConfigEntry("~/Library/Application Support/Trae/User/settings.json")
             ]
@@ -187,6 +203,7 @@ enum AgentDefinitions {
             id: "windsurf",
             displayName: "Windsurf",
             iconName: "Windsurf",
+            iconColor: Color(red: 0.15, green: 0.65, blue: 0.70),
             configFiles: [
                 AgentConfigEntry("~/Library/Application Support/Windsurf/User/settings.json")
             ]

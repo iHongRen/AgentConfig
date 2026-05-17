@@ -5,7 +5,7 @@
 //  Created by cxy on 2026/5/11.
 //
 
-import Foundation
+import SwiftUI
 
 // MARK: - FileType
 
@@ -85,6 +85,8 @@ struct AgentCategory: Identifiable, Equatable {
     let displayName: String
     /// Asset Catalog 中的图标名称
     let iconName: String
+    /// 侧边栏图标颜色
+    let iconColor: Color
     let files: [ConfigFile]
     let missingPaths: [URL]
 }

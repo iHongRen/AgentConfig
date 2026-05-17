@@ -172,7 +172,7 @@ struct SidebarView: View {
                 title: category.displayName,
                 count: category.files.count + category.missingPaths.count,
                 icon: category.iconName,
-                iconColor: agentColor(for: category.id),
+                iconColor: category.iconColor,
                 usesAssetIcon: true,
                 isExpanded: bindingForAgent(category.id)
             ) {
@@ -469,29 +469,6 @@ struct SidebarView: View {
             return "doc.text"
         case .plainText:
             return "doc"
-        }
-    }
-
-    private func agentColor(for id: String) -> Color {
-        switch id {
-        case "claude":
-            return Color(red: 0.95, green: 0.43, blue: 0.09)
-        case "qwen":
-            return Color(red: 0.50, green: 0.20, blue: 0.90)
-        case "codex":
-            return Color(nsColor: .labelColor)
-        case "cursor":
-            return Color(nsColor: .controlTextColor)
-        case "continue":
-            return Color(nsColor: .secondaryLabelColor)
-        case "aider":
-            return Color(red: 0.06, green: 0.74, blue: 0.58)
-        case "gemini":
-            return Color(red: 0.22, green: 0.40, blue: 0.92)
-        case "amazonq":
-            return Color(red: 0.96, green: 0.72, blue: 0.10)
-        default:
-            return Color.accentColor
         }
     }
 

@@ -202,6 +202,7 @@ struct FileListView: View {
         id: "claude",
         displayName: "Claude Code",
         iconName: "ClaudeCode",
+        iconColor: Color(red: 0.95, green: 0.43, blue: 0.09),
         files: [
             ConfigFile(url: URL(fileURLWithPath: "/Users/test/.claude/settings.json")),
             ConfigFile(url: URL(fileURLWithPath: "/Users/test/.claude/CLAUDE.md"), isModified: true)
