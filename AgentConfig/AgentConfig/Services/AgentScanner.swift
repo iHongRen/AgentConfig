@@ -58,6 +58,7 @@ struct AgentScanner: AgentScannerProtocol {
                 let category = AgentCategory(
                     id: definition.id,
                     displayName: definition.displayName,
+                    iconName: definition.iconName,
                     files: collectedFiles,
                     missingPaths: missingPaths
                 )

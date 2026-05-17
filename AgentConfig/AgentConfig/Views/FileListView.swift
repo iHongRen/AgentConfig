@@ -201,6 +201,7 @@ struct FileListView: View {
     let category = AgentCategory(
         id: "claude",
         displayName: "Claude Code",
+        iconName: "ClaudeCode",
         files: [
             ConfigFile(url: URL(fileURLWithPath: "/Users/test/.claude/settings.json")),
             ConfigFile(url: URL(fileURLWithPath: "/Users/test/.claude/CLAUDE.md"), isModified: true)

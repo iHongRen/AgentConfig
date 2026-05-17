@@ -171,8 +171,9 @@ struct SidebarView: View {
             SidebarDisclosureSection(
                 title: category.displayName,
                 count: category.files.count + category.missingPaths.count,
-                icon: agentIcon(for: category.id),
+                icon: category.iconName,
                 iconColor: agentColor(for: category.id),
+                usesAssetIcon: true,
                 isExpanded: bindingForAgent(category.id)
             ) {
                 ForEach(category.files) { file in
@@ -471,29 +472,6 @@ struct SidebarView: View {
         }
     }
 
-    private func agentIcon(for id: String) -> String {
-        switch id {
-        case "claude":
-            return "sparkle"
-        case "qwen":
-            return "wand.and.stars"
-        case "codex":
-            return "circle.hexagongrid"
-        case "cursor":
-            return "cube.fill"
-        case "continue":
-            return "circle.dashed"
-        case "aider":
-            return "pencil.and.outline"
-        case "gemini":
-            return "circle.grid.cross"
-        case "amazonq":
-            return "shippingbox.fill"
-        default:
-            return "terminal"
-        }
-    }
-
     private func agentColor(for id: String) -> Color {
         switch id {
         case "claude":
@@ -620,6 +598,7 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
     let count: Int
     let icon: String
     let iconColor: Color
+    let usesAssetIcon: Bool
     @Binding var isExpanded: Bool
     @ViewBuilder let content: () -> Content
     @ViewBuilder let contextMenu: (() -> Menu)?
@@ -629,6 +608,7 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
         count: Int,
         icon: String,
         iconColor: Color,
+        usesAssetIcon: Bool = false,
         isExpanded: Binding<Bool>,
         @ViewBuilder content: @escaping () -> Content,
         @ViewBuilder contextMenu: @escaping () -> Menu = { EmptyView() }
@@ -637,6 +617,7 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
         self.count = count
         self.icon = icon
         self.iconColor = iconColor
+        self.usesAssetIcon = usesAssetIcon
         self._isExpanded = isExpanded
         self.content = content
         self.contextMenu = contextMenu
@@ -657,9 +638,17 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
                     ZStack {
                         RoundedRectangle(cornerRadius: 4)
                             .fill(iconColor.opacity(0.16))
-                        Image(systemName: icon)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(iconColor)
+                        if usesAssetIcon {
+                            Image(icon)
+                                .renderingMode(.original)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 16, height: 16)
+                        } else {
+                            Image(systemName: icon)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(iconColor)
+                        }
                     }
                     .frame(width: 22, height: 22)
 

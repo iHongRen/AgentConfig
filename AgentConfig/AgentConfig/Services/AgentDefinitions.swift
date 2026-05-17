@@ -41,6 +41,8 @@ struct AgentDefinition {
     let id: String
     /// 用户可见的显示名称
     let displayName: String
+    /// Asset Catalog 中的图标名称，如 "ClaudeCode"
+    let iconName: String
     /// 该 Agent 应展示的可编辑配置文件列表
     let configFiles: [AgentConfigEntry]
 }
@@ -64,6 +66,7 @@ enum AgentDefinitions {
         AgentDefinition(
             id: "aider",
             displayName: "Aider",
+            iconName: "Aider",
             configFiles: [
                 AgentConfigEntry("~/.aider.conf.yml"),
                 AgentConfigEntry("~/.aider.model.settings.yml")
@@ -72,6 +75,7 @@ enum AgentDefinitions {
         AgentDefinition(
             id: "amazonq",
             displayName: "Amazon Q Developer",
+            iconName: "AmazonQ",
             configFiles: [
                 AgentConfigEntry("~/.aws/config"),
                 AgentConfigEntry("~/.aws/credentials")
@@ -80,6 +84,7 @@ enum AgentDefinitions {
         AgentDefinition(
             id: "augment",
             displayName: "Augment",
+            iconName: "Augment",
             configFiles: [
                 AgentConfigEntry("~/.augment/settings.json")
             ]
@@ -87,6 +92,7 @@ enum AgentDefinitions {
         AgentDefinition(
             id: "claude",
             displayName: "Claude Code",
+            iconName: "ClaudeCode",
             configFiles: [
                 AgentConfigEntry("~/.claude/settings.json"),
                 AgentConfigEntry("~/.claude.json")
@@ -95,6 +101,7 @@ enum AgentDefinitions {
         AgentDefinition(
             id: "cline",
             displayName: "Cline",
+            iconName: "Cline",
             configFiles: [
                 AgentConfigEntry("~/.cline/data/settings/providers.json"),
                 AgentConfigEntry("~/.cline/data/settings/global-settings.json")
@@ -103,6 +110,7 @@ enum AgentDefinitions {
         AgentDefinition(
             id: "codex",
             displayName: "Codex",
+            iconName: "Codex",
             configFiles: [
                 AgentConfigEntry("~/.codex/auth.json"),
                 AgentConfigEntry("~/.codex/config.toml")
@@ -111,6 +119,7 @@ enum AgentDefinitions {
         AgentDefinition(
             id: "continue",
             displayName: "Continue",
+            iconName: "Continue",
             configFiles: [
                 AgentConfigEntry("~/.continue/config.yaml"),
                 AgentConfigEntry("~/.continue/config.ts"),
@@ -120,6 +129,7 @@ enum AgentDefinitions {
         AgentDefinition(
             id: "cursor",
             displayName: "Cursor",
+            iconName: "Cursor",
             configFiles: [
                 AgentConfigEntry("~/Library/Application Support/Cursor/User/settings.json"),
                 AgentConfigEntry("~/.cursor/cli-config.json")
@@ -128,6 +138,7 @@ enum AgentDefinitions {
         AgentDefinition(
             id: "gemini",
             displayName: "Gemini CLI",
+            iconName: "GeminiCLI",
             configFiles: [
                 AgentConfigEntry("~/.gemini/settings.json")
             ]
@@ -135,6 +146,7 @@ enum AgentDefinitions {
         AgentDefinition(
             id: "github-copilot",
             displayName: "GitHub Copilot",
+            iconName: "GitHubCopilot",
             configFiles: [
                 AgentConfigEntry("~/Library/Application Support/Code/User/settings.json")
             ]
@@ -142,6 +154,7 @@ enum AgentDefinitions {
         AgentDefinition(
             id: "kilocode",
             displayName: "Kilo Code",
+            iconName: "KiloCode",
             configFiles: [
                 AgentConfigEntry("~/.config/kilo/kilo.jsonc")
             ]
@@ -149,6 +162,7 @@ enum AgentDefinitions {
         AgentDefinition(
             id: "opencode",
             displayName: "OpenCode CLI",
+            iconName: "OpenCodeCLI",
             configFiles: [
                 AgentConfigEntry("~/.config/opencode/opencode.json")
             ]
@@ -156,6 +170,7 @@ enum AgentDefinitions {
         AgentDefinition(
             id: "qwen",
             displayName: "Qwen Code",
+            iconName: "QwenCode",
             configFiles: [
                 AgentConfigEntry("~/.qwen/settings.json")
             ]
@@ -163,6 +178,7 @@ enum AgentDefinitions {
         AgentDefinition(
             id: "trae",
             displayName: "Trae",
+            iconName: "Trae",
             configFiles: [
                 AgentConfigEntry("~/Library/Application Support/Trae/User/settings.json")
             ]
@@ -170,6 +186,7 @@ enum AgentDefinitions {
         AgentDefinition(
             id: "windsurf",
             displayName: "Windsurf",
+            iconName: "Windsurf",
             configFiles: [
                 AgentConfigEntry("~/Library/Application Support/Windsurf/User/settings.json")
             ]

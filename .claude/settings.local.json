@@ -4,7 +4,8 @@
       "Bash(xcodebuild *)",
       "Bash(swift *)",
       "Bash(swiftc *)",
-      "Bash(python3 -)"
+      "Bash(python3 -)",
+      "Bash(xargs -I {} basename {} .imageset)"
     ]
   }
 }

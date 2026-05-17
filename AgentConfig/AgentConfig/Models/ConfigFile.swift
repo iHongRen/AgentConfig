@@ -83,6 +83,8 @@ struct AgentCategory: Identifiable, Equatable {
     /// Agent 名称，如 "claude"，用作唯一标识
     let id: String
     let displayName: String
+    /// Asset Catalog 中的图标名称
+    let iconName: String
     let files: [ConfigFile]
     let missingPaths: [URL]
 }
