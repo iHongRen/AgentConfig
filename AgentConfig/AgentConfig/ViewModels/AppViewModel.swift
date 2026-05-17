@@ -135,8 +135,6 @@ final class AppViewModel: ObservableObject {
             AgentCategory(
                 id: category.id,
                 displayName: category.displayName,
-                iconName: category.iconName,
-                iconColor: category.iconColor,
                 files: mergeFiles(category.files, with: addedFiles(for: .agent(id: category.id))),
                 missingPaths: category.missingPaths
             )
@@ -146,7 +144,7 @@ final class AppViewModel: ObservableObject {
             guard !categoryIDs.contains(definition.id) else { return nil }
             let files = addedFiles(for: .agent(id: definition.id))
             guard !files.isEmpty else { return nil }
-            return AgentCategory(id: definition.id, displayName: definition.displayName, iconName: definition.iconName, iconColor: definition.iconColor, files: files, missingPaths: [])
+            return AgentCategory(id: definition.id, displayName: definition.displayName, files: files, missingPaths: [])
         }
 
         return mergedCategories + addedOnlyCategories
@@ -176,8 +174,6 @@ final class AppViewModel: ObservableObject {
             AgentCategory(
                 id: category.id,
                 displayName: category.displayName,
-                iconName: category.iconName,
-                iconColor: category.iconColor,
                 files: category.files.filter { !isFileHidden($0.url) },
                 missingPaths: category.missingPaths.filter { !isFileHidden($0) }
             )

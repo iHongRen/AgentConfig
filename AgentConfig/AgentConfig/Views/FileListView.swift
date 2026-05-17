@@ -163,18 +163,7 @@ struct FileListView: View {
 
     /// 根据文件类型返回对应的 SF Symbol 图标名称
     private func fileTypeIcon(for fileType: FileType) -> String {
-        switch fileType {
-        case .json, .jsonc, .json5, .jsonl:
-            return "curlybraces"
-        case .yaml:
-            return "list.bullet.indent"
-        case .toml:
-            return "gearshape"
-        case .shell:
-            return "terminal"
-        case .plainText:
-            return "doc.text"
-        }
+        fileType.systemIconName
     }
 
     /// 创建缺失的环境变量文件
@@ -201,8 +190,6 @@ struct FileListView: View {
     let category = AgentCategory(
         id: "claude",
         displayName: "Claude Code",
-        iconName: "ClaudeCode",
-        iconColor: Color(red: 0.95, green: 0.43, blue: 0.09),
         files: [
             ConfigFile(url: URL(fileURLWithPath: "/Users/test/.claude/settings.json")),
             ConfigFile(url: URL(fileURLWithPath: "/Users/test/.claude/CLAUDE.md"), isModified: true)

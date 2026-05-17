@@ -20,6 +20,17 @@ enum FileType: Equatable {
     case shell
     case plainText
 
+    /// 对应的 SF Symbol 名称
+    var systemIconName: String {
+        switch self {
+        case .json, .jsonc, .json5, .jsonl: return "curlybraces"
+        case .yaml: return "list.bullet.indent"
+        case .toml: return "gearshape"
+        case .shell: return "terminal"
+        case .plainText: return "doc"
+        }
+    }
+
     /// 根据 URL 判断文件类型
     /// 优先检查扩展名，无扩展名时检查文件名
     static func detect(from url: URL) -> FileType {
@@ -83,12 +94,13 @@ struct AgentCategory: Identifiable, Equatable {
     /// Agent 名称，如 "claude"，用作唯一标识
     let id: String
     let displayName: String
-    /// Asset Catalog 中的图标名称
-    let iconName: String
-    /// 侧边栏图标颜色
-    let iconColor: Color
     let files: [ConfigFile]
     let missingPaths: [URL]
+
+    /// 从 AgentDefinitions 获取对应的图标名称
+    var iconName: String { AgentDefinitions.definition(for: id)?.iconName ?? "" }
+    /// 从 AgentDefinitions 获取对应的图标颜色
+    var iconColor: Color { AgentDefinitions.definition(for: id)?.iconColor ?? .accentColor }
 }
 
 // MARK: - EnvCategory

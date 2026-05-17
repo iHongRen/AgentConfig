@@ -87,7 +87,6 @@ struct SidebarView: View {
         .onAppear {
             expandedCustomPathIDs.formUnion(appViewModel.customPathGroups.map(\.id))
         }
-        .onChange(of: appViewModel.agentCategories) { _, _ in }
         .onChange(of: appViewModel.customPathGroups) { _, groups in
             expandedCustomPathIDs.formUnion(groups.map(\.id))
         }
@@ -137,7 +136,7 @@ struct SidebarView: View {
         SidebarDisclosureSection(
             title: "环境变量",
             count: category.files.count,
-            icon: "terminal.fill",
+            icon: .systemName("terminal.fill"),
             iconColor: Color(red: 0.22, green: 0.78, blue: 0.20),
             isExpanded: $isEnvExpanded
         ) {
@@ -171,9 +170,8 @@ struct SidebarView: View {
             SidebarDisclosureSection(
                 title: category.displayName,
                 count: category.files.count + category.missingPaths.count,
-                icon: category.iconName,
+                icon: .assetName(category.iconName),
                 iconColor: category.iconColor,
-                usesAssetIcon: true,
                 isExpanded: bindingForAgent(category.id)
             ) {
                 ForEach(category.files) { file in
@@ -213,7 +211,7 @@ struct SidebarView: View {
                     SidebarDisclosureSection(
                         title: customPathTitle(for: group.url),
                         count: group.files.count,
-                        icon: "folder.fill",
+                        icon: .systemName("folder.fill"),
                         iconColor: Color(nsColor: .tertiaryLabelColor),
                         isExpanded: bindingForCustomPath(group.id)
                     ) {
@@ -458,18 +456,7 @@ struct SidebarView: View {
     }
 
     private func fileTypeIcon(for fileType: FileType) -> String {
-        switch fileType {
-        case .json, .jsonc, .json5, .jsonl:
-            return "curlybraces"
-        case .yaml:
-            return "list.bullet.indent"
-        case .toml:
-            return "gearshape"
-        case .shell:
-            return "doc.text"
-        case .plainText:
-            return "doc"
-        }
+        fileType.systemIconName
     }
 
     private func createFile(at url: URL) {
@@ -573,9 +560,8 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
 
     let title: String
     let count: Int
-    let icon: String
+    let icon: SidebarIcon
     let iconColor: Color
-    let usesAssetIcon: Bool
     @Binding var isExpanded: Bool
     @ViewBuilder let content: () -> Content
     @ViewBuilder let contextMenu: (() -> Menu)?
@@ -583,9 +569,8 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
     init(
         title: String,
         count: Int,
-        icon: String,
+        icon: SidebarIcon,
         iconColor: Color,
-        usesAssetIcon: Bool = false,
         isExpanded: Binding<Bool>,
         @ViewBuilder content: @escaping () -> Content,
         @ViewBuilder contextMenu: @escaping () -> Menu = { EmptyView() }
@@ -594,7 +579,6 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
         self.count = count
         self.icon = icon
         self.iconColor = iconColor
-        self.usesAssetIcon = usesAssetIcon
         self._isExpanded = isExpanded
         self.content = content
         self.contextMenu = contextMenu
@@ -615,17 +599,7 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
                     ZStack {
                         RoundedRectangle(cornerRadius: 4)
                             .fill(iconColor.opacity(0.16))
-                        if usesAssetIcon {
-                            Image(icon)
-                                .renderingMode(.original)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 16, height: 16)
-                        } else {
-                            Image(systemName: icon)
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(iconColor)
-                        }
+                        icon.view
                     }
                     .frame(width: 22, height: 22)
 
@@ -689,6 +663,28 @@ private struct CountBadge: View {
                 Capsule()
                     .fill(Color(nsColor: .quaternaryLabelColor))
             )
+    }
+}
+
+// MARK: - SidebarIcon
+
+private enum SidebarIcon {
+    case systemName(String)
+    case assetName(String)
+
+    @ViewBuilder
+    var view: some View {
+        switch self {
+        case .systemName(let name):
+            Image(systemName: name)
+                .font(.system(size: 14, weight: .semibold))
+        case .assetName(let name):
+            Image(name)
+                .renderingMode(.original)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 16, height: 16)
+        }
     }
 }
 
