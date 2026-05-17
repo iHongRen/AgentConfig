@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 // MARK: - SidebarView
 
@@ -18,6 +19,7 @@ struct SidebarView: View {
     @State private var isEnvExpanded = true
     @State private var expandedAgentIDs: Set<String> = []
     @State private var expandedCustomPathIDs: Set<String> = []
+    @State private var targetedDropCategoryKey: String?
     @State private var deleteTarget: DeleteTarget?
 
     enum DeleteTarget: Identifiable {
@@ -147,10 +149,20 @@ struct SidebarView: View {
                 missingFileRow(missingURL)
             }
         } contextMenu: {
+            Button("添加文件") {
+                openFilePicker(for: .env, directoryURL: preferredDirectory(for: category))
+            }
+
+            Divider()
+
             Button("在 Finder 中打开") {
                 let home = FileManager.default.homeDirectoryForCurrentUser
                 NSWorkspace.shared.activateFileViewerSelecting([home])
             }
+        }
+        .dropTargetStyle(isTargeted: targetedDropCategoryKey == SidebarCategoryKey.env.storageKey)
+        .onDrop(of: [UTType.fileURL.identifier], isTargeted: dropTargetBinding(for: .env)) { providers in
+            addDroppedFiles(from: providers, to: .env)
         }
     }
 
@@ -171,6 +183,12 @@ struct SidebarView: View {
                     missingFileRow(missingURL)
                 }
             } contextMenu: {
+                Button("添加文件") {
+                    openFilePicker(for: .agent(id: category.id), directoryURL: preferredDirectory(for: category))
+                }
+
+                Divider()
+
                 Button("在 Finder 中打开") {
                     let representativeURL = category.files.first?.url
                         ?? category.missingPaths.first
@@ -179,6 +197,10 @@ struct SidebarView: View {
                     }
                 }
                 .disabled(category.files.isEmpty && category.missingPaths.isEmpty)
+            }
+            .dropTargetStyle(isTargeted: targetedDropCategoryKey == SidebarCategoryKey.agent(id: category.id).storageKey)
+            .onDrop(of: [UTType.fileURL.identifier], isTargeted: dropTargetBinding(for: .agent(id: category.id))) { providers in
+                addDroppedFiles(from: providers, to: .agent(id: category.id))
             }
         }
     }
@@ -198,6 +220,10 @@ struct SidebarView: View {
                             fileRow(file, showsPathHint: group.files.count <= 4)
                         }
                     } contextMenu: {
+                        Button("添加文件") {
+                            openFilePicker(for: .customPath(group.url), directoryURL: preferredDirectory(for: group))
+                        }
+
                         Button("在 Finder 中打开") {
                             NSWorkspace.shared.activateFileViewerSelecting([group.url])
                         }
@@ -207,6 +233,10 @@ struct SidebarView: View {
                         Button("删除") {
                             deleteTarget = .customPath(group.url)
                         }
+                    }
+                    .dropTargetStyle(isTargeted: targetedDropCategoryKey == SidebarCategoryKey.customPath(group.url).storageKey)
+                    .onDrop(of: [UTType.fileURL.identifier], isTargeted: dropTargetBinding(for: .customPath(group.url))) { providers in
+                        addDroppedFiles(from: providers, to: .customPath(group.url))
                     }
                 }
             }
@@ -380,6 +410,15 @@ struct SidebarView: View {
         )
     }
 
+    private func dropTargetBinding(for categoryKey: SidebarCategoryKey) -> Binding<Bool> {
+        Binding(
+            get: { targetedDropCategoryKey == categoryKey.storageKey },
+            set: { isTargeted in
+                targetedDropCategoryKey = isTargeted ? categoryKey.storageKey : nil
+            }
+        )
+    }
+
     private func customPathTitle(for url: URL) -> String {
         let path = url.path
         let home = FileManager.default.homeDirectoryForCurrentUser.path
@@ -396,6 +435,25 @@ struct SidebarView: View {
             return "~" + String(parentPath.dropFirst(home.count))
         }
         return parentPath
+    }
+
+    private func preferredDirectory(for category: EnvCategory) -> URL {
+        category.files.first?.url.deletingLastPathComponent()
+            ?? category.missingPaths.first?.deletingLastPathComponent()
+            ?? FileManager.default.homeDirectoryForCurrentUser
+    }
+
+    private func preferredDirectory(for category: AgentCategory) -> URL? {
+        category.files.first?.url.deletingLastPathComponent()
+            ?? category.missingPaths.first?.deletingLastPathComponent()
+    }
+
+    private func preferredDirectory(for group: CustomPathGroup) -> URL {
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: group.url.path, isDirectory: &isDirectory), isDirectory.boolValue {
+            return group.url
+        }
+        return group.url.deletingLastPathComponent()
     }
 
     private func fileTypeIcon(for fileType: FileType) -> String {
@@ -476,6 +534,64 @@ struct SidebarView: View {
             let fileService = FileService()
             try? await fileService.delete(at: url)
             await appViewModel.refresh()
+        }
+    }
+
+    private func addDroppedFiles(from providers: [NSItemProvider], to categoryKey: SidebarCategoryKey) -> Bool {
+        let fileURLProviders = providers.filter { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) }
+        guard !fileURLProviders.isEmpty else { return false }
+
+        expandCategory(categoryKey)
+        for provider in fileURLProviders {
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                guard let url = fileURL(from: item) else { return }
+                Task { @MainActor in
+                    appViewModel.addFiles([url], to: categoryKey)
+                }
+            }
+        }
+        return true
+    }
+
+    private func fileURL(from item: NSSecureCoding?) -> URL? {
+        if let url = item as? URL {
+            return url
+        }
+        if let data = item as? Data {
+            return URL(dataRepresentation: data, relativeTo: nil)
+        }
+        if let string = item as? String {
+            return URL(string: string)
+        }
+        return nil
+    }
+
+    private func expandCategory(_ categoryKey: SidebarCategoryKey) {
+        switch categoryKey {
+        case .env:
+            isEnvExpanded = true
+        case .agent(let id):
+            expandedAgentIDs.insert(id)
+        case .customPath(let url):
+            expandedCustomPathIDs.insert(url.standardizedFileURL.path)
+        }
+    }
+
+    private func openFilePicker(for categoryKey: SidebarCategoryKey, directoryURL: URL?) {
+        let panel = NSOpenPanel()
+        panel.title = "添加文件"
+        panel.message = "选择要添加到此分类的文件"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = true
+        panel.canCreateDirectories = false
+        panel.directoryURL = directoryURL
+
+        panel.begin { response in
+            if response == .OK {
+                expandCategory(categoryKey)
+                appViewModel.addFiles(panel.urls, to: categoryKey)
+            }
         }
     }
 
@@ -575,6 +691,24 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
     }
 }
 
+private struct DropTargetStyle: ViewModifier {
+    let isTargeted: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .padding(3)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(isTargeted ? Color.accentColor.opacity(0.10) : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(isTargeted ? Color.accentColor.opacity(0.65) : Color.clear, style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
+            )
+            .animation(.easeInOut(duration: 0.12), value: isTargeted)
+    }
+}
+
 private struct CountBadge: View {
     let count: Int
 
@@ -589,6 +723,12 @@ private struct CountBadge: View {
                 Capsule()
                     .fill(Color(nsColor: .quaternaryLabelColor))
             )
+    }
+}
+
+private extension View {
+    func dropTargetStyle(isTargeted: Bool) -> some View {
+        modifier(DropTargetStyle(isTargeted: isTargeted))
     }
 }
 

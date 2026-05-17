@@ -28,10 +28,15 @@ struct EditorToolbarView: View {
     /// Git ViewModel，提供 Git 仓库状态
     @ObservedObject var gitViewModel: GitViewModel
 
+    var isExamplesVisible: Bool = false
+    var hasExamples: Bool = false
+
     // MARK: - Callbacks
 
     /// 点击搜索按钮时的回调
     var onShowSearch: (() -> Void)?
+
+    var onToggleExamples: (() -> Void)?
 
     /// 点击"历史记录"按钮时的回调
     var onShowHistory: (() -> Void)?
@@ -47,18 +52,24 @@ struct EditorToolbarView: View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 tabView
+                    .layoutPriority(0)
 
-                Spacer()
+                Spacer(minLength: 8)
 
-                searchButton
+                HStack(spacing: 8) {
+                    searchButton
+                    examplesButton
 
-                if isJSONFile {
-                    formatButton
+                    if isJSONFile {
+                        formatButton
+                    }
+
+                    if gitViewModel.isGitRepo {
+                        historyButton
+                    }
                 }
-
-                if gitViewModel.isGitRepo {
-                    historyButton
-                }
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(2)
             }
             .frame(height: 39)
             .padding(.horizontal, 10)
@@ -94,7 +105,8 @@ struct EditorToolbarView: View {
         }
         .padding(.horizontal, 13)
         .frame(height: 39)
-        .frame(minWidth: 168, idealWidth: 220, maxWidth: 280, alignment: .leading)
+        .frame(minWidth: 0, idealWidth: 180, maxWidth: 280, alignment: .leading)
+        .clipped()
         .background(
             Rectangle()
                 .fill(Color.editorTabBackground)
@@ -103,40 +115,52 @@ struct EditorToolbarView: View {
     }
 
     private var searchButton: some View {
-        Button {
+        toolbarIconButton(systemName: "magnifyingglass", isActive: false) {
             onShowSearch?()
-        } label: {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 13, weight: .medium))
         }
-        .buttonStyle(.borderless)
-        .controlSize(.small)
         .help("搜索")
+    }
+
+    private var examplesButton: some View {
+        toolbarIconButton(systemName: "sidebar.right", isActive: isExamplesVisible) {
+            onToggleExamples?()
+        }
+        .disabled(!hasExamples)
+        .opacity(hasExamples ? 1 : 0.45)
+        .help(hasExamples ? "显示配置示例" : "当前文件暂无示例")
+    }
+
+    private func toolbarIconButton(systemName: String, isActive: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(isActive ? Color.white : Color.primary)
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(isActive ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7)
+                        .strokeBorder(Color(nsColor: .separatorColor).opacity(isActive ? 0 : 0.8))
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     /// 格式化按钮
     private var formatButton: some View {
-        Button {
+        toolbarIconButton(systemName: "text.alignleft", isActive: false) {
             performFormat()
-        } label: {
-            Image(systemName: "text.alignleft")
-                .font(.system(size: 13, weight: .medium))
         }
-        .buttonStyle(.borderless)
-        .controlSize(.small)
         .help(NSLocalizedString("toolbar.format.help", value: "将 JSON 内容格式化为 4 空格缩进", comment: "Format button tooltip"))
     }
 
     /// 历史记录按钮
     private var historyButton: some View {
-        Button {
+        toolbarIconButton(systemName: "clock.arrow.circlepath", isActive: false) {
             onShowHistory?()
-        } label: {
-            Image(systemName: "clock.arrow.circlepath")
-                .font(.system(size: 13, weight: .medium))
         }
-        .buttonStyle(.borderless)
-        .controlSize(.small)
         .help(NSLocalizedString("toolbar.history.help", value: "查看 Git 提交历史", comment: "History button tooltip"))
     }
 
@@ -258,7 +282,9 @@ private struct FormatErrorInfo: Equatable {
     return EditorToolbarView(
         editorViewModel: editorVM,
         gitViewModel: gitVM,
+        hasExamples: true,
         onShowSearch: {},
+        onToggleExamples: {},
         onShowHistory: { print("Show history") }
     )
     .frame(width: 600)

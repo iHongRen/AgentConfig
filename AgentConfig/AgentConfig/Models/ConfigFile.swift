@@ -97,6 +97,25 @@ struct EnvCategory: Equatable {
     let missingPaths: [URL]
 }
 
+// MARK: - SidebarCategoryKey
+
+enum SidebarCategoryKey: Hashable {
+    case env
+    case agent(id: String)
+    case customPath(URL)
+
+    var storageKey: String {
+        switch self {
+        case .env:
+            return "env"
+        case .agent(let id):
+            return "agent:\(id)"
+        case .customPath(let url):
+            return "custom:\(url.standardizedFileURL.path)"
+        }
+    }
+}
+
 // MARK: - CustomPathGroup
 
 /// 用户添加的自定义路径分组。路径可以是单个文件，也可以是目录。

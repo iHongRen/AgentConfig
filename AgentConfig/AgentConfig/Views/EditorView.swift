@@ -502,54 +502,39 @@ struct EditorView: View {
     @Environment(\.colorScheme) var colorScheme
 
     @State private var isSearchBarVisible = false
+    @State private var isExamplesPaneVisible = false
     @State private var isShowingHistory = false
     @State private var cursorLine = 1
     @State private var cursorColumn = 1
+    @State private var examplesPaneWidth: CGFloat = 340
     @State private var toastMessage: String? = nil
     @State private var toastTask: Task<Void, Never>? = nil
 
     var body: some View {
-        VStack(spacing: 0) {
-            EditorToolbarView(
-                editorViewModel: editorViewModel,
-                gitViewModel: gitViewModel,
-                onShowSearch: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                        isSearchBarVisible = true
-                    }
-                },
-                onShowHistory: { isShowingHistory = true }
-            )
-
+        Group {
             if editorViewModel.currentFile == nil {
-                emptyStateView
+                VStack(spacing: 0) {
+                    editorToolbar
+                    emptyStateView
+                }
             } else {
-                ZStack(alignment: .top) {
+                HStack(spacing: 0) {
                     VStack(spacing: 0) {
-                        CodeEditorView(
-                            text: $editorViewModel.content,
-                            cursorLine: $cursorLine,
-                            cursorColumn: $cursorColumn,
-                            fileType: editorViewModel.currentFile?.fileType ?? .plainText,
-                            isDarkMode: colorScheme == .dark,
-                            searchResults: editorViewModel.searchResults,
-                            currentSearchIndex: editorViewModel.currentSearchIndex,
-                            scrollRevision: editorViewModel.scrollRevision,
-                            isSearchBarVisible: isSearchBarVisible
-                        )
-
-                        statusBar
+                        editorToolbar
+                        editorContent
                     }
+                    .frame(minWidth: 280)
 
-                    SearchBarView(isVisible: $isSearchBarVisible, viewModel: editorViewModel)
-                        .offset(y: isSearchBarVisible ? 0 : -40)
-                        .opacity(isSearchBarVisible ? 1 : 0)
-                        .allowsHitTesting(isSearchBarVisible)
+                    if isExamplesPaneVisible {
+                        ResizableDivider(width: $examplesPaneWidth)
 
-                    if let msg = toastMessage {
-                        toastView(message: msg)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                            .padding(.bottom, 44)
+                        ConfigExamplesPaneView(
+                            groups: exampleGroups,
+                            file: editorViewModel.currentFile,
+                            onCopy: copyExampleToClipboard
+                        )
+                        .frame(width: examplesPaneWidth)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
                 }
             }
@@ -587,10 +572,77 @@ struct EditorView: View {
             let msg = result.success ? "source 执行成功" : "source 失败：\(result.errorOutput)"
             showToast(msg)
         }
-        .onChange(of: editorViewModel.currentFile) { _, _ in
+        .onChange(of: editorViewModel.currentFile) { _, newFile in
             cursorLine = 1
             cursorColumn = 1
             isSearchBarVisible = false
+            if examples(for: newFile).isEmpty {
+                isExamplesPaneVisible = false
+            }
+        }
+    }
+
+    private var editorToolbar: some View {
+        EditorToolbarView(
+            editorViewModel: editorViewModel,
+            gitViewModel: gitViewModel,
+            isExamplesVisible: isExamplesPaneVisible,
+            hasExamples: hasExamples,
+            onShowSearch: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    isSearchBarVisible = true
+                }
+            },
+            onToggleExamples: {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    isExamplesPaneVisible.toggle()
+                }
+            },
+            onShowHistory: { isShowingHistory = true }
+        )
+    }
+
+    private var exampleGroups: [ConfigExampleGroup] {
+        examples(for: editorViewModel.currentFile)
+    }
+
+    private var hasExamples: Bool {
+        !exampleGroups.isEmpty
+    }
+
+    private func examples(for file: ConfigFile?) -> [ConfigExampleGroup] {
+        guard let file else { return [] }
+        return ConfigExamples.groups(for: file)
+    }
+
+    private var editorContent: some View {
+        ZStack(alignment: .top) {
+            VStack(spacing: 0) {
+                CodeEditorView(
+                    text: $editorViewModel.content,
+                    cursorLine: $cursorLine,
+                    cursorColumn: $cursorColumn,
+                    fileType: editorViewModel.currentFile?.fileType ?? .plainText,
+                    isDarkMode: colorScheme == .dark,
+                    searchResults: editorViewModel.searchResults,
+                    currentSearchIndex: editorViewModel.currentSearchIndex,
+                    scrollRevision: editorViewModel.scrollRevision,
+                    isSearchBarVisible: isSearchBarVisible
+                )
+
+                statusBar
+            }
+
+            SearchBarView(isVisible: $isSearchBarVisible, viewModel: editorViewModel)
+                .offset(y: isSearchBarVisible ? 0 : -40)
+                .opacity(isSearchBarVisible ? 1 : 0)
+                .allowsHitTesting(isSearchBarVisible)
+
+            if let msg = toastMessage {
+                toastView(message: msg)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .padding(.bottom, 44)
+            }
         }
     }
 
@@ -673,6 +725,12 @@ struct EditorView: View {
             .background(Capsule().fill(Color(nsColor: .labelColor).opacity(0.78)))
     }
 
+    private func copyExampleToClipboard(_ code: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(code, forType: .string)
+        showToast("已复制示例")
+    }
+
     private func showToast(_ message: String) {
         toastTask?.cancel()
         withAnimation(.easeInOut(duration: 0.2)) { toastMessage = message }
@@ -683,6 +741,50 @@ struct EditorView: View {
                 withAnimation(.easeInOut(duration: 0.3)) { toastMessage = nil }
             }
         }
+    }
+}
+
+private struct ResizableDivider: View {
+    @Binding var width: CGFloat
+    @State private var dragStartWidth: CGFloat?
+    @State private var dragStartX: CGFloat?
+
+    var body: some View {
+        Rectangle()
+            .fill(Color.clear)
+            .frame(width: 12)
+            .overlay(
+                Rectangle()
+                    .fill(Color(nsColor: .separatorColor))
+                    .frame(width: 1)
+            )
+            .contentShape(Rectangle())
+            .transaction { transaction in
+                transaction.animation = nil
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                    .onChanged { value in
+                        if dragStartWidth == nil {
+                            dragStartWidth = width
+                            dragStartX = value.startLocation.x
+                        }
+                        guard let dragStartWidth, let dragStartX else { return }
+                        let proposedWidth = dragStartWidth - (value.location.x - dragStartX)
+                        width = min(max(proposedWidth, 260), 560)
+                    }
+                    .onEnded { _ in
+                        dragStartWidth = nil
+                        dragStartX = nil
+                    }
+            )
+            .onHover { isHovering in
+                if isHovering {
+                    NSCursor.resizeLeftRight.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
     }
 }
 
