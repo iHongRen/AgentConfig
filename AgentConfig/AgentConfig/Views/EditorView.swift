@@ -204,11 +204,14 @@ struct CodeEditorView: NSViewRepresentable {
             let line = max(lines.count, 1)
             let column = (lines.last?.count ?? 0) + 1
 
-            if parent.cursorLine != line {
-                parent.cursorLine = line
-            }
-            if parent.cursorColumn != column {
-                parent.cursorColumn = column
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                if self.parent.cursorLine != line {
+                    self.parent.cursorLine = line
+                }
+                if self.parent.cursorColumn != column {
+                    self.parent.cursorColumn = column
+                }
             }
         }
 

@@ -61,13 +61,13 @@ final class AppViewModel: ObservableObject {
     ///   - fileService: 文件读写服务，默认使用 `FileService()`
     ///   - settings: 应用设置，默认从 UserDefaults 加载
     init(
-        scanner: AgentScannerProtocol = AgentScanner(),
-        fileService: FileServiceProtocol = FileService(),
-        settings: AppSettings = AppSettings.load()
+        scanner: AgentScannerProtocol? = nil,
+        fileService: FileServiceProtocol? = nil,
+        settings: AppSettings? = nil
     ) {
-        self.scanner = scanner
-        self.fileService = fileService
-        self.settings = settings
+        self.scanner = scanner ?? AgentScanner()
+        self.fileService = fileService ?? FileService()
+        self.settings = settings ?? AppSettings.load()
 
         // 应用启动时自动触发扫描
         Task { await refresh() }

@@ -97,21 +97,23 @@ final class EditorViewModel: ObservableObject {
     ///   - gitService: Git 操作服务，默认使用 `GitService()`
     ///   - fileWatcher: 文件监控服务，默认使用 `FileWatcher()`
     init(
-        fileService: FileServiceProtocol = FileService(),
-        sourceRunner: SourceRunnerProtocol = SourceRunner(),
-        gitService: GitServiceProtocol = GitService(),
-        fileWatcher: FileWatcherProtocol = FileWatcher()
+        fileService: FileServiceProtocol? = nil,
+        sourceRunner: SourceRunnerProtocol? = nil,
+        gitService: GitServiceProtocol? = nil,
+        fileWatcher: FileWatcherProtocol? = nil
     ) {
-        self.fileService = fileService
-        self.sourceRunner = sourceRunner
-        self.gitService = gitService
-        self.fileWatcher = fileWatcher
+        self.fileService = fileService ?? FileService()
+        self.sourceRunner = sourceRunner ?? SourceRunner()
+        self.gitService = gitService ?? GitService()
+        self.fileWatcher = fileWatcher ?? FileWatcher()
     }
 
     // MARK: - Deinit
 
     deinit {
-        fileWatcher.stopWatching()
+        MainActor.assumeIsolated {
+            fileWatcher.stopWatching()
+        }
     }
 
     // MARK: - File Operations

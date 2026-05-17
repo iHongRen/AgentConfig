@@ -58,8 +58,8 @@ final class GitViewModel: ObservableObject {
 
     /// 初始化 GitViewModel
     /// - Parameter gitService: Git 操作服务，默认使用 `GitService()`
-    init(gitService: GitServiceProtocol = GitService()) {
-        self.gitService = gitService
+    init(gitService: GitServiceProtocol? = nil) {
+        self.gitService = gitService ?? GitService()
     }
 
     // MARK: - Public Methods
