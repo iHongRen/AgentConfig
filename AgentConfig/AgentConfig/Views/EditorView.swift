@@ -139,6 +139,9 @@ struct CodeEditorView: NSViewRepresentable {
         var isComposingMarkedText = false
         var lastScrollRevision: Int = -1
         var lastSearchBarVisible: Bool = false
+        var lastSearchResultsHash: Int?
+        var lastCurrentSearchIndex: Int?
+        var lastSearchHighlightDarkMode: Bool?
         /// 语法高亮完成后重新应用搜索背景色的回调（由 updateNSView 注入）
         var reapplySearchHighlights: ((NSTextView) -> Void)?
 
@@ -455,27 +458,44 @@ struct CodeEditorView: NSViewRepresentable {
 
     private func applySearchHighlights(to tv: NSTextView, context: Context) {
         guard let storage = tv.textStorage else { return }
-        let fullRange = NSRange(location: 0, length: storage.length)
 
-        // 先清除旧的搜索背景色
-        storage.removeAttribute(.backgroundColor, range: fullRange)
-
-        guard !searchResults.isEmpty else { return }
-
-        let allMatchColor: NSColor = isDarkMode
-            ? NSColor(red: 0.80, green: 0.65, blue: 0.10, alpha: 0.45)
-            : NSColor(red: 0.98, green: 0.85, blue: 0.10, alpha: 0.55)
-        let currentMatchColor: NSColor = isDarkMode
-            ? NSColor(red: 1.00, green: 0.75, blue: 0.00, alpha: 0.85)
-            : NSColor(red: 1.00, green: 0.72, blue: 0.00, alpha: 0.90)
-
-        storage.beginEditing()
-        for (i, range) in searchResults.enumerated() {
-            guard NSMaxRange(range) <= storage.length else { continue }
-            let color = i == currentSearchIndex ? currentMatchColor : allMatchColor
-            storage.addAttribute(.backgroundColor, value: color, range: range)
+        var hasher = Hasher()
+        hasher.combine(searchResults.count)
+        for range in searchResults {
+            hasher.combine(range.location)
+            hasher.combine(range.length)
         }
-        storage.endEditing()
+        let resultsHash = hasher.finalize()
+
+        let needsRepaint = context.coordinator.lastSearchResultsHash != resultsHash
+            || context.coordinator.lastCurrentSearchIndex != currentSearchIndex
+            || context.coordinator.lastSearchHighlightDarkMode != isDarkMode
+
+        if needsRepaint {
+            let fullRange = NSRange(location: 0, length: storage.length)
+            storage.removeAttribute(.backgroundColor, range: fullRange)
+
+            if !searchResults.isEmpty {
+                let allMatchColor: NSColor = isDarkMode
+                    ? NSColor(red: 0.80, green: 0.65, blue: 0.10, alpha: 0.45)
+                    : NSColor(red: 0.98, green: 0.85, blue: 0.10, alpha: 0.55)
+                let currentMatchColor: NSColor = isDarkMode
+                    ? NSColor(red: 1.00, green: 0.75, blue: 0.00, alpha: 0.85)
+                    : NSColor(red: 1.00, green: 0.72, blue: 0.00, alpha: 0.90)
+
+                storage.beginEditing()
+                for (i, range) in searchResults.enumerated() {
+                    guard NSMaxRange(range) <= storage.length else { continue }
+                    let color = i == currentSearchIndex ? currentMatchColor : allMatchColor
+                    storage.addAttribute(.backgroundColor, value: color, range: range)
+                }
+                storage.endEditing()
+            }
+
+            context.coordinator.lastSearchResultsHash = resultsHash
+            context.coordinator.lastCurrentSearchIndex = currentSearchIndex
+            context.coordinator.lastSearchHighlightDarkMode = isDarkMode
+        }
 
         // 滚动到当前匹配项（由 scrollRevision 驱动，避免每次 updateNSView 都滚动）
         let lastRevision = context.coordinator.lastScrollRevision
@@ -509,37 +529,62 @@ struct EditorView: View {
     @State private var isShowingHistory = false
     @State private var cursorLine = 1
     @State private var cursorColumn = 1
-    @State private var examplesPaneWidth: CGFloat = 340
+    @State private var examplesPaneWidth: CGFloat = 380
     @State private var toastMessage: String? = nil
     @State private var toastTask: Task<Void, Never>? = nil
 
+    private let preferredMinEditorWidth: CGFloat = 520
+    private let fallbackMinEditorWidth: CGFloat = 360
+    private let dividerLayoutWidth: CGFloat = 1
+    private let minExamplesWidth: CGFloat = 260
+    private let maxExamplesWidthCap: CGFloat = 520
+
     var body: some View {
-        Group {
-            if editorViewModel.currentFile == nil {
-                VStack(spacing: 0) {
-                    editorToolbar
-                    emptyStateView
-                }
-            } else {
-                HStack(spacing: 0) {
+        GeometryReader { proxy in
+            let totalWidth = proxy.size.width
+            let editorMinWidth = isExamplesPaneVisible ? fallbackMinEditorWidth : preferredMinEditorWidth
+            let availableExamplesWidth = totalWidth - editorMinWidth - dividerLayoutWidth
+            let clampedMaxExamplesWidth = min(maxExamplesWidthCap, max(0, availableExamplesWidth))
+            let effectiveExamplesMinWidth = min(minExamplesWidth, clampedMaxExamplesWidth)
+            let effectiveExamplesWidth = min(max(examplesPaneWidth, effectiveExamplesMinWidth), clampedMaxExamplesWidth)
+
+            Group {
+                if editorViewModel.currentFile == nil {
                     VStack(spacing: 0) {
                         editorToolbar
-                        editorContent
+                        emptyStateView
                     }
-                    .frame(minWidth: 280)
+                } else {
+                    HStack(spacing: 0) {
+                        VStack(spacing: 0) {
+                            editorToolbar
+                            editorContent
+                        }
+                        .frame(minWidth: editorMinWidth)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                        .animation(nil, value: isExamplesPaneVisible)
 
-                    if isExamplesPaneVisible {
-                        ResizableDivider(width: $examplesPaneWidth)
+                        if isExamplesPaneVisible, clampedMaxExamplesWidth > 0 {
+                            ResizableDivider(width: $examplesPaneWidth, minWidth: effectiveExamplesMinWidth, maxWidth: clampedMaxExamplesWidth)
+                                .zIndex(2)
 
-                        ConfigExamplesPaneView(
-                            groups: exampleGroups,
-                            file: editorViewModel.currentFile,
-                            onCopy: copyExampleToClipboard
-                        )
-                        .frame(width: examplesPaneWidth)
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                            ConfigExamplesPaneView(
+                                groups: exampleGroups,
+                                file: editorViewModel.currentFile,
+                                onCopy: copyExampleToClipboard
+                            )
+                            .frame(width: effectiveExamplesWidth)
+                            .transition(.opacity)
+                        }
                     }
                 }
+            }
+            .onAppear {
+                examplesPaneWidth = min(max(examplesPaneWidth, effectiveExamplesMinWidth), clampedMaxExamplesWidth)
+            }
+            .onChange(of: proxy.size.width) { _, _ in
+                examplesPaneWidth = min(max(examplesPaneWidth, effectiveExamplesMinWidth), clampedMaxExamplesWidth)
             }
         }
         .background(Color.editorPanelBackground)
@@ -749,43 +794,79 @@ struct EditorView: View {
 
 private struct ResizableDivider: View {
     @Binding var width: CGFloat
+    let minWidth: CGFloat
+    let maxWidth: CGFloat
+
+    private let interactionWidth: CGFloat = 16
+
     @State private var dragStartWidth: CGFloat?
     @State private var dragStartX: CGFloat?
+    @State private var isHovering = false
+    @State private var isDragging = false
+    @State private var isResizeCursorActive = false
+
+    private var showsHandle: Bool {
+        isHovering || isDragging
+    }
 
     var body: some View {
         Rectangle()
-            .fill(Color.clear)
-            .frame(width: 12)
-            .overlay(
+            .fill(Color(nsColor: .separatorColor).opacity(0.78))
+            .frame(width: 1)
+            .overlay {
                 Rectangle()
-                    .fill(Color(nsColor: .separatorColor))
-                    .frame(width: 1)
-            )
-            .contentShape(Rectangle())
-            .transaction { transaction in
-                transaction.animation = nil
-            }
-            .gesture(
-                DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                    .onChanged { value in
-                        if dragStartWidth == nil {
-                            dragStartWidth = width
-                            dragStartX = value.startLocation.x
+                    .fill(Color.clear)
+                    .frame(width: interactionWidth)
+                    .contentShape(Rectangle())
+                    .highPriorityGesture(
+                        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                            .onChanged { value in
+                                if dragStartWidth == nil {
+                                    dragStartWidth = width
+                                    dragStartX = value.startLocation.x
+                                    isDragging = true
+                                    isHovering = true
+                                    if !isResizeCursorActive {
+                                        NSCursor.resizeLeftRight.push()
+                                        isResizeCursorActive = true
+                                    }
+                                }
+                                guard let dragStartWidth, let dragStartX else { return }
+                                let proposedWidth = dragStartWidth - (value.location.x - dragStartX)
+                                width = min(max(proposedWidth, minWidth), maxWidth)
+                            }
+                            .onEnded { _ in
+                                dragStartWidth = nil
+                                dragStartX = nil
+                                isDragging = false
+                                if !isHovering, isResizeCursorActive {
+                                    NSCursor.pop()
+                                    isResizeCursorActive = false
+                                }
+                            }
+                    )
+                    .transaction { transaction in
+                        transaction.animation = nil
+                    }
+                    .onHover { hovering in
+                        isHovering = hovering
+                        if hovering {
+                            if !isResizeCursorActive {
+                                NSCursor.resizeLeftRight.push()
+                                isResizeCursorActive = true
+                            }
+                        } else if !isDragging, isResizeCursorActive {
+                            NSCursor.pop()
+                            isResizeCursorActive = false
                         }
-                        guard let dragStartWidth, let dragStartX else { return }
-                        let proposedWidth = dragStartWidth - (value.location.x - dragStartX)
-                        width = min(max(proposedWidth, 260), 560)
                     }
-                    .onEnded { _ in
-                        dragStartWidth = nil
-                        dragStartX = nil
-                    }
-            )
-            .onHover { isHovering in
-                if isHovering {
-                    NSCursor.resizeLeftRight.push()
-                } else {
-                    NSCursor.pop()
+            }
+            .overlay {
+                if showsHandle {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.accentColor.opacity(isDragging ? 0.2 : 0.12))
+                        .frame(width: 10)
+                        .allowsHitTesting(false)
                 }
             }
     }

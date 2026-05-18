@@ -28,8 +28,11 @@ struct ConfigExamplesPaneView: View {
                             groupView(group)
                         }
                     }
-                    .padding(16)
+                    .padding(.leading, 16)
+                    .padding(.trailing, 20)
+                    .padding(.vertical, 16)
                 }
+                .clipped()
             }
         }
         .background(Color.examplesPaneBackground)
