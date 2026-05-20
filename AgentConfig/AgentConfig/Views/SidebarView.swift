@@ -9,28 +9,20 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
-// MARK: - SidebarView
-
-/// 截图式左侧栏：分类、文件树和自定义路径入口集中在同一列。
 struct SidebarView: View {
 
     @EnvironmentObject var appViewModel: AppViewModel
 
     @State private var isEnvExpanded = true
     @State private var expandedAgentIDs: Set<String> = []
-    @State private var expandedCustomPathIDs: Set<String> = []
     @State private var targetedDropCategoryKey: String?
     @State private var deleteTarget: DeleteTarget?
 
     enum DeleteTarget: Identifiable {
-        case customPath(URL)
-        case fileInCustomPath(URL, groupURL: URL)
         case hideFile(URL)
 
         var id: String {
             switch self {
-            case .customPath(let url): return "path-\(url.absoluteString)"
-            case .fileInCustomPath(let url, _): return "file-\(url.absoluteString)"
             case .hideFile(let url): return "hide-\(url.absoluteString)"
             }
         }
@@ -40,77 +32,25 @@ struct SidebarView: View {
         VStack(spacing: 0) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 6) {
-                    sidebarHeader
-
                     if let envCategory = appViewModel.envCategory {
                         envSection(envCategory)
+                        Divider()
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
                     }
 
                     agentSections
-                    customPathSections
-                    addCustomPathButton
                 }
                 .padding(.horizontal, 10)
                 .padding(.top, 18)
                 .padding(.bottom, 16)
             }
-
         }
         .frame(minWidth: 260, idealWidth: 292, maxWidth: 360)
         .background(Color.agentSidebarBackground)
-        .toolbar {
-            ToolbarItemGroup {
-                Button {
-                    Task { await appViewModel.refresh() }
-                } label: {
-                    if appViewModel.isScanning {
-                        ProgressView()
-                            .controlSize(.small)
-                            .scaleEffect(0.72)
-                            .frame(width: 16, height: 16)
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                }
-                .disabled(appViewModel.isScanning)
-                .help("刷新")
-
-                Button {
-                    openFilePicker()
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .help("添加自定义路径")
-            }
-        }
         .navigationSplitViewColumnWidth(min: 260, ideal: 292, max: 360)
-        .onAppear {
-            expandedCustomPathIDs.formUnion(appViewModel.customPathGroups.map(\.id))
-        }
-        .onChange(of: appViewModel.customPathGroups) { _, groups in
-            expandedCustomPathIDs.formUnion(groups.map(\.id))
-        }
         .alert(item: $deleteTarget) { target in
             switch target {
-            case .customPath(let url):
-                return Alert(
-                    title: Text("确定要删除吗？"),
-                    message: Text("将从列表中移除此路径及其下所有文件：\n\(url.path)"),
-                    primaryButton: .destructive(Text("删除")) {
-                        appViewModel.removeCustomPath(url)
-                    },
-                    secondaryButton: .cancel()
-                )
-            case .fileInCustomPath(let url, let groupURL):
-                return Alert(
-                    title: Text("确定要删除吗？"),
-                    message: Text("将删除文件：\n\(url.path)"),
-                    primaryButton: .destructive(Text("删除")) {
-                        deleteFileAndRefresh(url)
-                        appViewModel.removeCustomPath(groupURL)
-                    },
-                    secondaryButton: .cancel()
-                )
             case .hideFile(let url):
                 return Alert(
                     title: Text("从列表移除？"),
@@ -124,14 +64,6 @@ struct SidebarView: View {
         }
     }
 
-    private var sidebarHeader: some View {
-        Text("分类")
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 10)
-            .padding(.bottom, 10)
-    }
-
     private func envSection(_ category: EnvCategory) -> some View {
         SidebarDisclosureSection(
             title: "环境变量",
@@ -142,10 +74,6 @@ struct SidebarView: View {
         ) {
             ForEach(category.files) { file in
                 fileRow(file)
-            }
-
-            ForEach(category.missingPaths, id: \.absoluteString) { missingURL in
-                missingFileRow(missingURL)
             }
         } contextMenu: {
             Button("添加文件") {
@@ -189,8 +117,7 @@ struct SidebarView: View {
                 Divider()
 
                 Button("在 Finder 中打开") {
-                    let representativeURL = category.files.first?.url
-                        ?? category.missingPaths.first
+                    let representativeURL = category.files.first?.url ?? category.missingPaths.first
                     if let url = representativeURL {
                         NSWorkspace.shared.activateFileViewerSelecting([url])
                     }
@@ -204,69 +131,7 @@ struct SidebarView: View {
         }
     }
 
-    private var customPathSections: some View {
-        Group {
-            if !appViewModel.customPathGroups.isEmpty {
-                ForEach(appViewModel.customPathGroups) { group in
-                    SidebarDisclosureSection(
-                        title: customPathTitle(for: group.url),
-                        count: group.files.count,
-                        icon: .systemName("folder.fill"),
-                        iconColor: Color(nsColor: .tertiaryLabelColor),
-                        isExpanded: bindingForCustomPath(group.id)
-                    ) {
-                        ForEach(group.files) { file in
-                            fileRow(file, showsPathHint: group.files.count <= 4)
-                        }
-                    } contextMenu: {
-                        Button("添加文件") {
-                            openFilePicker(for: .customPath(group.url), directoryURL: preferredDirectory(for: group))
-                        }
-
-                        Button("在 Finder 中打开") {
-                            NSWorkspace.shared.activateFileViewerSelecting([group.url])
-                        }
-
-                        Divider()
-
-                        Button("删除") {
-                            deleteTarget = .customPath(group.url)
-                        }
-                    }
-                    .dropTargetStyle(isTargeted: targetedDropCategoryKey == SidebarCategoryKey.customPath(group.url).storageKey)
-                    .onDrop(of: [UTType.fileURL.identifier], isTargeted: dropTargetBinding(for: .customPath(group.url))) { providers in
-                        addDroppedFiles(from: providers, to: .customPath(group.url))
-                    }
-                }
-            }
-        }
-    }
-
-    private var addCustomPathButton: some View {
-        Button {
-            openFilePicker()
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .medium))
-                    .frame(width: 18)
-
-                Text("添加自定义路径")
-                    .font(.system(size: 14, weight: .medium))
-
-                Spacer()
-            }
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(.top, 6)
-    }
-
-
-    private func fileRow(_ file: ConfigFile, showsPathHint: Bool = false) -> some View {
+    private func fileRow(_ file: ConfigFile) -> some View {
         Button {
             appViewModel.selectedFile = file
         } label: {
@@ -276,21 +141,11 @@ struct SidebarView: View {
                     .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                     .frame(width: 18)
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(file.url.lastPathComponent)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-
-                    if showsPathHint {
-                        Text(pathHint(for: file.url))
-                            .font(.system(size: 11))
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                            .truncationMode(.head)
-                    }
-                }
+                Text(file.url.lastPathComponent)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
 
                 Spacer(minLength: 4)
 
@@ -302,7 +157,7 @@ struct SidebarView: View {
             }
             .padding(.leading, 34)
             .padding(.trailing, 10)
-            .padding(.vertical, showsPathHint ? 6 : 7)
+            .padding(.vertical, 7)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(RoundedRectangle(cornerRadius: 7))
             .background(
@@ -396,19 +251,6 @@ struct SidebarView: View {
         )
     }
 
-    private func bindingForCustomPath(_ id: String) -> Binding<Bool> {
-        Binding(
-            get: { expandedCustomPathIDs.contains(id) },
-            set: { isExpanded in
-                if isExpanded {
-                    expandedCustomPathIDs.insert(id)
-                } else {
-                    expandedCustomPathIDs.remove(id)
-                }
-            }
-        )
-    }
-
     private func dropTargetBinding(for categoryKey: SidebarCategoryKey) -> Binding<Bool> {
         Binding(
             get: { targetedDropCategoryKey == categoryKey.storageKey },
@@ -416,24 +258,6 @@ struct SidebarView: View {
                 targetedDropCategoryKey = isTargeted ? categoryKey.storageKey : nil
             }
         )
-    }
-
-    private func customPathTitle(for url: URL) -> String {
-        let path = url.path
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        if path.hasPrefix(home) {
-            return "~" + String(path.dropFirst(home.count))
-        }
-        return path
-    }
-
-    private func pathHint(for url: URL) -> String {
-        let parentPath = url.deletingLastPathComponent().path
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        if parentPath.hasPrefix(home) {
-            return "~" + String(parentPath.dropFirst(home.count))
-        }
-        return parentPath
     }
 
     private func preferredDirectory(for category: EnvCategory) -> URL {
@@ -445,14 +269,6 @@ struct SidebarView: View {
     private func preferredDirectory(for category: AgentCategory) -> URL? {
         category.files.first?.url.deletingLastPathComponent()
             ?? category.missingPaths.first?.deletingLastPathComponent()
-    }
-
-    private func preferredDirectory(for group: CustomPathGroup) -> URL {
-        var isDirectory: ObjCBool = false
-        if FileManager.default.fileExists(atPath: group.url.path, isDirectory: &isDirectory), isDirectory.boolValue {
-            return group.url
-        }
-        return group.url.deletingLastPathComponent()
     }
 
     private func fileTypeIcon(for fileType: FileType) -> String {
@@ -468,14 +284,6 @@ struct SidebarView: View {
             } catch {
                 appViewModel.selectedFile = nil
             }
-        }
-    }
-
-    private func deleteFileAndRefresh(_ url: URL) {
-        Task {
-            let fileService = FileService()
-            try? await fileService.delete(at: url)
-            await appViewModel.refresh()
         }
     }
 
@@ -496,15 +304,9 @@ struct SidebarView: View {
     }
 
     private func fileURL(from item: NSSecureCoding?) -> URL? {
-        if let url = item as? URL {
-            return url
-        }
-        if let data = item as? Data {
-            return URL(dataRepresentation: data, relativeTo: nil)
-        }
-        if let string = item as? String {
-            return URL(string: string)
-        }
+        if let url = item as? URL { return url }
+        if let data = item as? Data { return URL(dataRepresentation: data, relativeTo: nil) }
+        if let string = item as? String { return URL(string: string) }
         return nil
     }
 
@@ -514,8 +316,8 @@ struct SidebarView: View {
             isEnvExpanded = true
         case .agent(let id):
             expandedAgentIDs.insert(id)
-        case .customPath(let url):
-            expandedCustomPathIDs.insert(url.standardizedFileURL.path)
+        case .customPath:
+            break
         }
     }
 
@@ -536,28 +338,9 @@ struct SidebarView: View {
             }
         }
     }
-
-    private func openFilePicker() {
-        let panel = NSOpenPanel()
-        panel.title = "选择配置文件或目录"
-        panel.message = "选择要添加的配置文件或目录"
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.canCreateDirectories = false
-
-        panel.begin { response in
-            if response == .OK, let url = panel.url {
-                appViewModel.addCustomPath(url)
-            }
-        }
-    }
 }
 
-// MARK: - SidebarDisclosureSection
-
 private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
-
     let title: String
     let count: Int
     let icon: SidebarIcon
@@ -666,8 +449,6 @@ private struct CountBadge: View {
     }
 }
 
-// MARK: - SidebarIcon
-
 private enum SidebarIcon {
     case systemName(String)
     case assetName(String)
@@ -699,8 +480,6 @@ private extension Color {
         Color(nsColor: .windowBackgroundColor)
     }
 }
-
-// MARK: - Preview
 
 #Preview {
     let viewModel = AppViewModel()
