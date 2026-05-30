@@ -15,8 +15,8 @@ struct CodexProfileEditorView: View {
     @State private var toastTask: Task<Void, Never>?
     @State private var measuredEditorHeights: [ProfileCodeField: CGFloat] = [:]
     @State private var customEditorHeights: [ProfileCodeField: CGFloat] = [:]
-    @State private var resizeStartHeights: [ProfileCodeField: CGFloat] = [:]
     @State private var resizingFields: Set<ProfileCodeField> = []
+    @State private var pendingDeleteProfile: CodexProfile?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -77,8 +77,21 @@ struct CodexProfileEditorView: View {
         .onChange(of: viewModel.selectedProfileID) { _, _ in
             measuredEditorHeights = [:]
             customEditorHeights = [:]
-            resizeStartHeights = [:]
             resizingFields = []
+        }
+        .alert(item: $pendingDeleteProfile) { profile in
+            Alert(
+                title: Text("删除 Codex Profile？"),
+                message: Text("将删除“\(profile.name.isEmpty ? "未命名配置" : profile.name)”。此操作不会修改已经写入磁盘的 Codex 配置文件。"),
+                primaryButton: .destructive(Text("删除")) {
+                    if viewModel.deleteProfile(id: profile.id) {
+                        showToast("已删除配置")
+                    } else {
+                        showToast(viewModel.lastErrorMessage ?? "删除失败")
+                    }
+                },
+                secondaryButton: .cancel(Text("取消"))
+            )
         }
     }
 
@@ -101,6 +114,17 @@ struct CodexProfileEditorView: View {
             statusPill(for: profile)
 
             Spacer(minLength: 12)
+
+            Button(role: .destructive) {
+                pendingDeleteProfile = profile
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 26, height: 26)
+            }
+            .buttonStyle(.bordered)
+            .disabled(viewModel.profiles.count <= 1)
+            .help("删除当前配置")
 
             Button {
                 Task {
@@ -225,31 +249,23 @@ struct CodexProfileEditorView: View {
     }
 
     private func resizeHitArea(for field: ProfileCodeField) -> some View {
-        Rectangle()
-            .fill(Color.clear)
-            .frame(height: 10)
-        .contentShape(Rectangle())
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { value in
-                    if resizeStartHeights[field] == nil {
-                        resizeStartHeights[field] = editorHeight(for: field)
-                    }
-                    resizingFields.insert(field)
-                    let startHeight = resizeStartHeights[field] ?? editorHeight(for: field)
-                    var transaction = Transaction()
-                    transaction.disablesAnimations = true
-                    withTransaction(transaction) {
-                        customEditorHeights[field] = ProfileEditorSizing.clampedCustomHeight(
-                            startHeight + value.translation.height
-                        )
-                    }
+        ProfileResizeHandleView(
+            currentHeight: editorHeight(for: field),
+            onResizeStart: {
+                resizingFields.insert(field)
+            },
+            onResize: { newHeight in
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    customEditorHeights[field] = ProfileEditorSizing.clampedCustomHeight(newHeight)
                 }
-                .onEnded { _ in
-                    resizeStartHeights[field] = nil
-                    resizingFields.remove(field)
-                }
+            },
+            onResizeEnd: {
+                resizingFields.remove(field)
+            }
         )
+        .frame(height: ProfileEditorSizing.resizeHandleHeight)
         .help("拖动底部边缘调整高度")
     }
 
@@ -382,6 +398,7 @@ private enum ProfileEditorSizing {
     static let fallbackHeight: CGFloat = 180
     static let maximumDefaultHeight: CGFloat = 460
     static let maximumCustomHeight: CGFloat = 900
+    static let resizeHandleHeight: CGFloat = 16
 
     static func clampedDefaultHeight(_ height: CGFloat) -> CGFloat {
         min(max(height, minimumHeight), maximumDefaultHeight)
@@ -389,6 +406,113 @@ private enum ProfileEditorSizing {
 
     static func clampedCustomHeight(_ height: CGFloat) -> CGFloat {
         min(max(height, minimumHeight), maximumCustomHeight)
+    }
+}
+
+private struct ProfileResizeHandleView: NSViewRepresentable {
+    let currentHeight: CGFloat
+    let onResizeStart: () -> Void
+    let onResize: (CGFloat) -> Void
+    let onResizeEnd: () -> Void
+
+    func makeNSView(context: Context) -> ResizeHandleNSView {
+        let view = ResizeHandleNSView()
+        view.currentHeight = currentHeight
+        view.onResizeStart = onResizeStart
+        view.onResize = onResize
+        view.onResizeEnd = onResizeEnd
+        return view
+    }
+
+    func updateNSView(_ nsView: ResizeHandleNSView, context: Context) {
+        nsView.currentHeight = currentHeight
+        nsView.onResizeStart = onResizeStart
+        nsView.onResize = onResize
+        nsView.onResizeEnd = onResizeEnd
+    }
+
+    final class ResizeHandleNSView: NSView {
+        var currentHeight: CGFloat = ProfileEditorSizing.fallbackHeight
+        var onResizeStart: (() -> Void)?
+        var onResize: ((CGFloat) -> Void)?
+        var onResizeEnd: (() -> Void)?
+
+        private var trackingArea: NSTrackingArea?
+        private var startHeight: CGFloat?
+        private var startMouseY: CGFloat?
+
+        override init(frame frameRect: NSRect) {
+            super.init(frame: frameRect)
+            wantsLayer = true
+        }
+
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override var acceptsFirstResponder: Bool {
+            true
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            bounds.contains(point) ? self : nil
+        }
+
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+
+            if let trackingArea {
+                removeTrackingArea(trackingArea)
+            }
+
+            let area = NSTrackingArea(
+                rect: bounds,
+                options: [.mouseEnteredAndExited, .mouseMoved, .cursorUpdate, .activeInKeyWindow, .inVisibleRect],
+                owner: self,
+                userInfo: nil
+            )
+            addTrackingArea(area)
+            trackingArea = area
+        }
+
+        override func resetCursorRects() {
+            super.resetCursorRects()
+            addCursorRect(bounds, cursor: .resizeUpDown)
+        }
+
+        override func cursorUpdate(with event: NSEvent) {
+            NSCursor.resizeUpDown.set()
+        }
+
+        override func mouseEntered(with event: NSEvent) {
+            NSCursor.resizeUpDown.set()
+        }
+
+        override func mouseMoved(with event: NSEvent) {
+            NSCursor.resizeUpDown.set()
+        }
+
+        override func mouseDown(with event: NSEvent) {
+            window?.makeFirstResponder(self)
+            NSCursor.resizeUpDown.set()
+            startHeight = currentHeight
+            startMouseY = event.locationInWindow.y
+            onResizeStart?()
+        }
+
+        override func mouseDragged(with event: NSEvent) {
+            NSCursor.resizeUpDown.set()
+            guard let startHeight, let startMouseY else { return }
+            let delta = startMouseY - event.locationInWindow.y
+            onResize?(ProfileEditorSizing.clampedCustomHeight(startHeight + delta))
+        }
+
+        override func mouseUp(with event: NSEvent) {
+            startHeight = nil
+            startMouseY = nil
+            NSCursor.resizeUpDown.set()
+            onResizeEnd?()
+        }
     }
 }
 

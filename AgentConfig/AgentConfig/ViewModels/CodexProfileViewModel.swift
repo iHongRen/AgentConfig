@@ -88,6 +88,29 @@ final class CodexProfileViewModel: ObservableObject {
         Task { await persistProfiles() }
     }
 
+    func deleteProfile(id: UUID) -> Bool {
+        guard profiles.count > 1 else {
+            lastErrorMessage = "至少需要保留一个 Codex Profile。"
+            return false
+        }
+        guard let index = profiles.firstIndex(where: { $0.id == id }) else {
+            lastErrorMessage = "未找到要删除的 Codex Profile。"
+            return false
+        }
+
+        let deletedWasSelected = selectedProfileID == id
+        profiles.remove(at: index)
+
+        if deletedWasSelected {
+            let nextIndex = min(index, profiles.count - 1)
+            selectedProfileID = profiles.indices.contains(nextIndex) ? profiles[nextIndex].id : profiles.first?.id
+        }
+
+        lastErrorMessage = nil
+        Task { await persistProfiles() }
+        return true
+    }
+
     func applySelected() async -> Bool {
         guard let selectedProfile, let selectedIndex else { return false }
         if let validationError = validate(profile: selectedProfile) {

@@ -21,10 +21,12 @@ struct SidebarView: View {
 
     enum DeleteTarget: Identifiable {
         case hideFile(URL)
+        case deleteCodexProfile(CodexProfile)
 
         var id: String {
             switch self {
             case .hideFile(let url): return "hide-\(url.absoluteString)"
+            case .deleteCodexProfile(let profile): return "profile-\(profile.id.uuidString)"
             }
         }
     }
@@ -58,6 +60,15 @@ struct SidebarView: View {
                     message: Text("将从侧边栏移除此文件，但不会删除实际文件。\n\(url.path)"),
                     primaryButton: .default(Text("移除")) {
                         appViewModel.hideFile(url)
+                    },
+                    secondaryButton: .cancel(Text("取消"))
+                )
+            case .deleteCodexProfile(let profile):
+                return Alert(
+                    title: Text("删除 Codex Profile？"),
+                    message: Text("将删除“\(profile.name.isEmpty ? "未命名配置" : profile.name)”。此操作不会修改已经写入磁盘的 Codex 配置文件。"),
+                    primaryButton: .destructive(Text("删除")) {
+                        _ = codexProfileViewModel.deleteProfile(id: profile.id)
                     },
                     secondaryButton: .cancel(Text("取消"))
                 )
@@ -220,6 +231,12 @@ struct SidebarView: View {
             )
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            Button("删除 Profile") {
+                deleteTarget = .deleteCodexProfile(profile)
+            }
+            .disabled(codexProfileViewModel.profiles.count <= 1)
+        }
     }
 
     private func fileRow(_ file: ConfigFile) -> some View {
