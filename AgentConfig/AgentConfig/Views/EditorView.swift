@@ -519,72 +519,28 @@ struct CodeEditorView: NSViewRepresentable {
 struct EditorView: View {
 
     @ObservedObject var editorViewModel: EditorViewModel
-    @ObservedObject var gitViewModel: GitViewModel
     @ObservedObject var saveCoordinator: CommandCoordinator
 
     @Environment(\.colorScheme) var colorScheme
 
     @State private var isSearchBarVisible = false
-    @State private var isExamplesPaneVisible = false
-    @State private var isShowingHistory = false
     @State private var cursorLine = 1
     @State private var cursorColumn = 1
-    @State private var examplesPaneWidth: CGFloat = 380
     @State private var toastMessage: String? = nil
     @State private var toastTask: Task<Void, Never>? = nil
 
-    private let preferredMinEditorWidth: CGFloat = 520
-    private let fallbackMinEditorWidth: CGFloat = 360
-    private let dividerLayoutWidth: CGFloat = 1
-    private let minExamplesWidth: CGFloat = 260
-    private let maxExamplesWidthCap: CGFloat = 520
-
     var body: some View {
-        GeometryReader { proxy in
-            let totalWidth = proxy.size.width
-            let editorMinWidth = isExamplesPaneVisible ? fallbackMinEditorWidth : preferredMinEditorWidth
-            let availableExamplesWidth = totalWidth - editorMinWidth - dividerLayoutWidth
-            let clampedMaxExamplesWidth = min(maxExamplesWidthCap, max(0, availableExamplesWidth))
-            let effectiveExamplesMinWidth = min(minExamplesWidth, clampedMaxExamplesWidth)
-            let effectiveExamplesWidth = min(max(examplesPaneWidth, effectiveExamplesMinWidth), clampedMaxExamplesWidth)
-
-            Group {
-                if editorViewModel.currentFile == nil {
-                    VStack(spacing: 0) {
-                        editorToolbar
-                        emptyStateView
-                    }
-                } else {
-                    HStack(spacing: 0) {
-                        VStack(spacing: 0) {
-                            editorToolbar
-                            editorContent
-                        }
-                        .frame(minWidth: editorMinWidth)
-                        .frame(maxWidth: .infinity)
-                        .clipped()
-                        .animation(nil, value: isExamplesPaneVisible)
-
-                        if isExamplesPaneVisible, clampedMaxExamplesWidth > 0 {
-                            ResizableDivider(width: $examplesPaneWidth, minWidth: effectiveExamplesMinWidth, maxWidth: clampedMaxExamplesWidth)
-                                .zIndex(2)
-
-                            ConfigExamplesPaneView(
-                                groups: exampleGroups,
-                                file: editorViewModel.currentFile,
-                                onCopy: copyExampleToClipboard
-                            )
-                            .frame(width: effectiveExamplesWidth)
-                            .transition(.opacity)
-                        }
-                    }
+        Group {
+            if editorViewModel.currentFile == nil {
+                VStack(spacing: 0) {
+                    editorToolbar
+                    emptyStateView
                 }
-            }
-            .onAppear {
-                examplesPaneWidth = min(max(examplesPaneWidth, effectiveExamplesMinWidth), clampedMaxExamplesWidth)
-            }
-            .onChange(of: proxy.size.width) { _, _ in
-                examplesPaneWidth = min(max(examplesPaneWidth, effectiveExamplesMinWidth), clampedMaxExamplesWidth)
+            } else {
+                VStack(spacing: 0) {
+                    editorToolbar
+                    editorContent
+                }
             }
         }
         .background(Color.editorPanelBackground)
@@ -598,9 +554,6 @@ struct EditorView: View {
                     isSearchBarVisible = true
                 }
             }
-        }
-        .sheet(isPresented: $isShowingHistory) {
-            GitHistoryView(gitViewModel: gitViewModel)
         }
         .alert(
             "文件已被外部修改",
@@ -624,43 +577,18 @@ struct EditorView: View {
             cursorLine = 1
             cursorColumn = 1
             isSearchBarVisible = false
-            if examples(for: newFile).isEmpty {
-                isExamplesPaneVisible = false
-            }
         }
     }
 
     private var editorToolbar: some View {
         EditorToolbarView(
             editorViewModel: editorViewModel,
-            gitViewModel: gitViewModel,
-            isExamplesVisible: isExamplesPaneVisible,
-            hasExamples: hasExamples,
             onShowSearch: {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                     isSearchBarVisible = true
                 }
-            },
-            onToggleExamples: {
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    isExamplesPaneVisible.toggle()
-                }
-            },
-            onShowHistory: { isShowingHistory = true }
+            }
         )
-    }
-
-    private var exampleGroups: [ConfigExampleGroup] {
-        examples(for: editorViewModel.currentFile)
-    }
-
-    private var hasExamples: Bool {
-        !exampleGroups.isEmpty
-    }
-
-    private func examples(for file: ConfigFile?) -> [ConfigExampleGroup] {
-        guard let file else { return [] }
-        return ConfigExamples.groups(for: file)
     }
 
     private var editorContent: some View {
@@ -770,13 +698,7 @@ struct EditorView: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(Capsule().fill(Color(nsColor: .labelColor).opacity(0.78)))
-    }
-
-    private func copyExampleToClipboard(_ code: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(code, forType: .string)
-        showToast("已复制示例")
+        .background(Capsule().fill(Color(nsColor: .labelColor).opacity(0.78)))
     }
 
     private func showToast(_ message: String) {
@@ -789,86 +711,6 @@ struct EditorView: View {
                 withAnimation(.easeInOut(duration: 0.3)) { toastMessage = nil }
             }
         }
-    }
-}
-
-private struct ResizableDivider: View {
-    @Binding var width: CGFloat
-    let minWidth: CGFloat
-    let maxWidth: CGFloat
-
-    private let interactionWidth: CGFloat = 16
-
-    @State private var dragStartWidth: CGFloat?
-    @State private var dragStartX: CGFloat?
-    @State private var isHovering = false
-    @State private var isDragging = false
-    @State private var isResizeCursorActive = false
-
-    private var showsHandle: Bool {
-        isHovering || isDragging
-    }
-
-    var body: some View {
-        Rectangle()
-            .fill(Color(nsColor: .separatorColor).opacity(0.78))
-            .frame(width: 1)
-            .overlay {
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(width: interactionWidth)
-                    .contentShape(Rectangle())
-                    .highPriorityGesture(
-                        DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                            .onChanged { value in
-                                if dragStartWidth == nil {
-                                    dragStartWidth = width
-                                    dragStartX = value.startLocation.x
-                                    isDragging = true
-                                    isHovering = true
-                                    if !isResizeCursorActive {
-                                        NSCursor.resizeLeftRight.push()
-                                        isResizeCursorActive = true
-                                    }
-                                }
-                                guard let dragStartWidth, let dragStartX else { return }
-                                let proposedWidth = dragStartWidth - (value.location.x - dragStartX)
-                                width = min(max(proposedWidth, minWidth), maxWidth)
-                            }
-                            .onEnded { _ in
-                                dragStartWidth = nil
-                                dragStartX = nil
-                                isDragging = false
-                                if !isHovering, isResizeCursorActive {
-                                    NSCursor.pop()
-                                    isResizeCursorActive = false
-                                }
-                            }
-                    )
-                    .transaction { transaction in
-                        transaction.animation = nil
-                    }
-                    .onHover { hovering in
-                        isHovering = hovering
-                        if hovering {
-                            if !isResizeCursorActive {
-                                NSCursor.resizeLeftRight.push()
-                                isResizeCursorActive = true
-                            }
-                        } else if !isDragging, isResizeCursorActive {
-                            NSCursor.pop()
-                            isResizeCursorActive = false
-                        }
-                    }
-            }
-            .overlay {
-                if showsHandle {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.accentColor.opacity(isDragging ? 0.2 : 0.12))
-                        .frame(width: 10)
-                        .allowsHitTesting(false)
-                }
-            }
     }
 }
 
@@ -885,6 +727,6 @@ private extension Color {
 // MARK: - Preview
 //
 //#Preview("Empty State") {
-//    EditorView(editorViewModel: EditorViewModel(), gitViewModel: GitViewModel())
+//    EditorView(editorViewModel: EditorViewModel())
 //        .frame(width: 700, height: 500)
 //}

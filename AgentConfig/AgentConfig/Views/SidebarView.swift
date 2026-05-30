@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 struct SidebarView: View {
 
     @EnvironmentObject var appViewModel: AppViewModel
+    @ObservedObject var codexProfileViewModel: CodexProfileViewModel
 
     @State private var isEnvExpanded = true
     @State private var expandedAgentIDs: Set<String> = []
@@ -102,6 +103,11 @@ struct SidebarView: View {
                 iconColor: category.iconColor,
                 isExpanded: bindingForAgent(category.id)
             ) {
+                if category.id == "codex" {
+                    codexProfileSection
+                    sidebarSubheading("Files")
+                }
+
                 ForEach(category.files) { file in
                     fileRow(file)
                 }
@@ -131,8 +137,89 @@ struct SidebarView: View {
         }
     }
 
+    private var codexProfileSection: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            HStack {
+                sidebarSubheading("Profiles")
+
+                Spacer()
+
+                Button {
+                    codexProfileViewModel.addProfile()
+                    appViewModel.selectedFile = nil
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .bold))
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .help("新增 Codex Profile")
+
+                CountBadge(count: codexProfileViewModel.profiles.count)
+                    .padding(.trailing, 10)
+            }
+
+            ForEach(codexProfileViewModel.profiles) { profile in
+                codexProfileRow(profile)
+            }
+        }
+    }
+
+    private func sidebarSubheading(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+            .padding(.leading, 34)
+            .padding(.top, 8)
+            .padding(.bottom, 3)
+    }
+
+    private func codexProfileRow(_ profile: CodexProfile) -> some View {
+        Button {
+            appViewModel.selectedFile = nil
+            codexProfileViewModel.selectProfile(profile)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "rectangle.stack")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    .frame(width: 18)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(profile.name.isEmpty ? "未命名配置" : profile.name)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Text(profileStatusText(profile))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 4)
+
+                Circle()
+                    .fill(profileStateColor(profile))
+                    .frame(width: 8, height: 8)
+            }
+            .padding(.leading, 34)
+            .padding(.trailing, 10)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(RoundedRectangle(cornerRadius: 7))
+            .background(
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(codexProfileViewModel.selectedProfileID == profile.id ? Color.accentColor.opacity(0.16) : Color.clear)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
     private func fileRow(_ file: ConfigFile) -> some View {
         Button {
+            codexProfileViewModel.clearSelection()
             appViewModel.selectedFile = file
         } label: {
             HStack(spacing: 10) {
@@ -204,6 +291,18 @@ struct SidebarView: View {
         Button("从列表移除") {
             deleteTarget = .hideFile(file.url)
         }
+    }
+
+    private func profileStatusText(_ profile: CodexProfile) -> String {
+        if profile.isDirty { return "未应用" }
+        if profile.isActive { return "已应用" }
+        return "草稿"
+    }
+
+    private func profileStateColor(_ profile: CodexProfile) -> Color {
+        if profile.isDirty { return .orange }
+        if profile.isActive { return .green }
+        return Color(nsColor: .tertiaryLabelColor)
     }
 
     private func missingFileRow(_ url: URL) -> some View {
@@ -483,8 +582,9 @@ private extension Color {
 
 #Preview {
     let viewModel = AppViewModel()
+    let codexProfileViewModel = CodexProfileViewModel()
     NavigationSplitView {
-        SidebarView()
+        SidebarView(codexProfileViewModel: codexProfileViewModel)
             .environmentObject(viewModel)
     } detail: {
         Text("编辑器")

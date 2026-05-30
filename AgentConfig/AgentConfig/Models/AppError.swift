@@ -20,12 +20,6 @@ enum AppError: LocalizedError {
     /// JSON 格式化错误，包含行列位置信息
     case jsonFormatError(line: Int, column: Int, message: String)
 
-    /// 系统未安装 Git
-    case gitNotInstalled
-
-    /// Git 命令执行失败
-    case gitCommandFailed(command: String, stderr: String)
-
     /// source 命令执行失败
     case sourceFailed(stderr: String)
 
@@ -54,20 +48,6 @@ enum AppError: LocalizedError {
                 comment: "Error when JSON formatting fails"
             )
 
-        case .gitNotInstalled:
-            return NSLocalizedString(
-                "error.gitNotInstalled",
-                value: "Git is not installed. Please install Git to use version history features.",
-                comment: "Error when Git is not installed"
-            )
-
-        case .gitCommandFailed(let command, let stderr):
-            return NSLocalizedString(
-                "error.gitCommandFailed",
-                value: "Git command \"\(command)\" failed: \(stderr)",
-                comment: "Error when a Git command fails"
-            )
-
         case .sourceFailed(let stderr):
             return NSLocalizedString(
                 "error.sourceFailed",
@@ -85,14 +65,6 @@ enum AppError: LocalizedError {
             return error.localizedDescription
         case .jsonFormatError(_, _, let message):
             return message
-        case .gitNotInstalled:
-            return NSLocalizedString(
-                "error.gitNotInstalled.reason",
-                value: "Git executable not found in PATH.",
-                comment: "Failure reason when Git is not installed"
-            )
-        case .gitCommandFailed(_, let stderr):
-            return stderr
         case .sourceFailed(let stderr):
             return stderr
         }
@@ -117,18 +89,6 @@ enum AppError: LocalizedError {
                 "error.jsonFormatError.recovery",
                 value: "Fix the JSON syntax error and try formatting again.",
                 comment: "Recovery suggestion for JSON format error"
-            )
-        case .gitNotInstalled:
-            return NSLocalizedString(
-                "error.gitNotInstalled.recovery",
-                value: "Install Git via Homebrew: brew install git",
-                comment: "Recovery suggestion when Git is not installed"
-            )
-        case .gitCommandFailed:
-            return NSLocalizedString(
-                "error.gitCommandFailed.recovery",
-                value: "Check the Git repository status and try again.",
-                comment: "Recovery suggestion for Git command failure"
             )
         case .sourceFailed:
             return NSLocalizedString(

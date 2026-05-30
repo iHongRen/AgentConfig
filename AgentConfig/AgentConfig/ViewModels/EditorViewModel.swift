@@ -12,7 +12,7 @@ import Combine
 
 /// 编辑器 ViewModel，负责文件内容的加载、编辑、保存、搜索和格式化
 ///
-/// - 注入 `FileServiceProtocol`、`SourceRunnerProtocol`、`GitServiceProtocol` 依赖
+/// - 注入 `FileServiceProtocol`、`SourceRunnerProtocol` 依赖
 /// - 通过 `@Published` 属性驱动 SwiftUI 视图更新
 /// - 支持撤销/重做（≥100步）、搜索导航、JSON 格式化
 @MainActor
@@ -71,7 +71,6 @@ final class EditorViewModel: ObservableObject {
 
     private let fileService: FileServiceProtocol
     private let sourceRunner: SourceRunnerProtocol
-    private let gitService: GitServiceProtocol
     private let fileWatcher: FileWatcherProtocol
 
     // MARK: - Undo/Redo
@@ -94,17 +93,14 @@ final class EditorViewModel: ObservableObject {
     /// - Parameters:
     ///   - fileService: 文件读写服务，默认使用 `FileService()`
     ///   - sourceRunner: source 执行服务，默认使用 `SourceRunner()`
-    ///   - gitService: Git 操作服务，默认使用 `GitService()`
     ///   - fileWatcher: 文件监控服务，默认使用 `FileWatcher()`
     init(
         fileService: FileServiceProtocol? = nil,
         sourceRunner: SourceRunnerProtocol? = nil,
-        gitService: GitServiceProtocol? = nil,
         fileWatcher: FileWatcherProtocol? = nil
     ) {
         self.fileService = fileService ?? FileService()
         self.sourceRunner = sourceRunner ?? SourceRunner()
-        self.gitService = gitService ?? GitService()
         self.fileWatcher = fileWatcher ?? FileWatcher()
     }
 

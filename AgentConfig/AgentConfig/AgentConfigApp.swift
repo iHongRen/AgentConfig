@@ -52,7 +52,7 @@ struct AgentConfigApp: App {
 
     @StateObject private var appViewModel = AppViewModel()
     @StateObject private var editorViewModel = EditorViewModel()
-    @StateObject private var gitViewModel = GitViewModel()
+    @StateObject private var codexProfileViewModel = CodexProfileViewModel()
     @StateObject private var saveCoordinator = CommandCoordinator()
 
     // MARK: - Appearance
@@ -71,14 +71,13 @@ struct AgentConfigApp: App {
             MainContentView(
                 appViewModel: appViewModel,
                 editorViewModel: editorViewModel,
-                gitViewModel: gitViewModel,
+                codexProfileViewModel: codexProfileViewModel,
                 saveCoordinator: saveCoordinator
             )
             .id(languageChangeID)  // 语言切换时强制重建整个视图树
             .preferredColorScheme(preferredColorScheme)
             .onAppear {
                 applyAppearance(appViewModel.settings.appearanceMode)
-                setupGitViewModelRestoreCallback()
                 setupForegroundObserver()
             }
             .onReceive(NotificationCenter.default.publisher(for: .languageDidChange)) { _ in
@@ -136,17 +135,6 @@ struct AgentConfigApp: App {
         }
     }
 
-    /// 设置 GitViewModel 的 onRestore 回调，将恢复内容写入 EditorViewModel
-    private func setupGitViewModelRestoreCallback() {
-        gitViewModel.onRestore = { [weak editorViewModel = editorViewModel] restoredContent in
-            guard let vm = editorViewModel else { return }
-            Task { @MainActor in
-                vm.content = restoredContent
-                vm.isModified = true
-            }
-        }
-    }
-
     /// 监听应用前台切换事件，触发 EditorViewModel.onForeground()
     private func setupForegroundObserver() {
         NotificationCenter.default.addObserver(
@@ -180,27 +168,30 @@ struct MainContentView: View {
 
     @ObservedObject var appViewModel: AppViewModel
     @ObservedObject var editorViewModel: EditorViewModel
-    @ObservedObject var gitViewModel: GitViewModel
+    @ObservedObject var codexProfileViewModel: CodexProfileViewModel
     @ObservedObject var saveCoordinator: CommandCoordinator
 
     var body: some View {
         NavigationSplitView {
-            SidebarView()
+            SidebarView(codexProfileViewModel: codexProfileViewModel)
                 .environmentObject(appViewModel)
         } detail: {
-            EditorView(
-                editorViewModel: editorViewModel,
-                gitViewModel: gitViewModel,
-                saveCoordinator: saveCoordinator
-            )
+            if codexProfileViewModel.selectedProfile != nil {
+                CodexProfileEditorView(viewModel: codexProfileViewModel)
+            } else {
+                EditorView(
+                    editorViewModel: editorViewModel,
+                    saveCoordinator: saveCoordinator
+                )
+            }
         }
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 980, minHeight: 640)
         .onChange(of: appViewModel.selectedFile) { _, newFile in
             guard let file = newFile else { return }
+            codexProfileViewModel.clearSelection()
             Task {
                 try? await editorViewModel.load(file: file)
-                await gitViewModel.loadHistory(for: file)
             }
         }
         // 同步 autoSource 设置

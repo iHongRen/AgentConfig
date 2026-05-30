@@ -14,7 +14,6 @@ import SwiftUI
 /// 功能：
 /// - 显示当前文件名（有未保存修改时显示"● 文件名"）
 /// - JSON/JSONC 文件显示"格式化"按钮
-/// - Git 仓库文件显示"历史记录"按钮
 /// - 格式化失败时在工具栏下方内联显示错误位置信息
 ///
 /// _Requirements: 3.4, 3.5, 7.1_
@@ -25,21 +24,10 @@ struct EditorToolbarView: View {
     /// 编辑器 ViewModel，提供文件状态、格式化功能
     @ObservedObject var editorViewModel: EditorViewModel
 
-    /// Git ViewModel，提供 Git 仓库状态
-    @ObservedObject var gitViewModel: GitViewModel
-
-    var isExamplesVisible: Bool = false
-    var hasExamples: Bool = false
-
     // MARK: - Callbacks
 
     /// 点击搜索按钮时的回调
     var onShowSearch: (() -> Void)?
-
-    var onToggleExamples: (() -> Void)?
-
-    /// 点击"历史记录"按钮时的回调
-    var onShowHistory: (() -> Void)?
 
     // MARK: - Private State
 
@@ -58,14 +46,9 @@ struct EditorToolbarView: View {
 
                 HStack(spacing: 8) {
                     searchButton
-                    examplesButton
 
                     if isJSONFile {
                         formatButton
-                    }
-
-                    if gitViewModel.isGitRepo {
-                        historyButton
                     }
                 }
                 .fixedSize(horizontal: true, vertical: false)
@@ -121,15 +104,6 @@ struct EditorToolbarView: View {
         .help("搜索")
     }
 
-    private var examplesButton: some View {
-        toolbarIconButton(systemName: "sidebar.right", isActive: isExamplesVisible) {
-            onToggleExamples?()
-        }
-        .disabled(!hasExamples)
-        .opacity(hasExamples ? 1 : 0.45)
-        .help(hasExamples ? "显示配置示例" : "当前文件暂无示例")
-    }
-
     private func toolbarIconButton(systemName: String, isActive: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
@@ -154,14 +128,6 @@ struct EditorToolbarView: View {
             performFormat()
         }
         .help(NSLocalizedString("toolbar.format.help", value: "将 JSON 内容格式化为 4 空格缩进", comment: "Format button tooltip"))
-    }
-
-    /// 历史记录按钮
-    private var historyButton: some View {
-        toolbarIconButton(systemName: "clock.arrow.circlepath", isActive: false) {
-            onShowHistory?()
-        }
-        .help(NSLocalizedString("toolbar.history.help", value: "查看 Git 提交历史", comment: "History button tooltip"))
     }
 
     /// 格式化错误横幅（内联显示错误行列位置）
@@ -277,15 +243,10 @@ private struct FormatErrorInfo: Equatable {
 
 #Preview("有文件 - JSON") {
     let editorVM = EditorViewModel()
-    let gitVM = GitViewModel()
 
     return EditorToolbarView(
         editorViewModel: editorVM,
-        gitViewModel: gitVM,
-        hasExamples: true,
-        onShowSearch: {},
-        onToggleExamples: {},
-        onShowHistory: { print("Show history") }
+        onShowSearch: {}
     )
     .frame(width: 600)
 }
