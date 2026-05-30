@@ -183,38 +183,4 @@ struct FileListView: View {
     }
 }
 
-// MARK: - Preview
 
-#Preview("Agent Category") {
-    let appViewModel = AppViewModel()
-    let category = AgentCategory(
-        id: "claude",
-        displayName: "Claude Code",
-        files: [
-            ConfigFile(url: URL(fileURLWithPath: "/Users/test/.claude/settings.json")),
-            ConfigFile(url: URL(fileURLWithPath: "/Users/test/.claude/CLAUDE.md"), isModified: true)
-        ],
-        missingPaths: [
-            URL(fileURLWithPath: "/Users/test/.claude.json")
-        ]
-    )
-    return FileListView(selection: .agent(category))
-        .environmentObject(appViewModel)
-        .frame(width: 220, height: 400)
-}
-
-#Preview("Env Category") {
-    let appViewModel = AppViewModel()
-    let category = EnvCategory(
-        files: [
-            ConfigFile(url: URL(fileURLWithPath: "/Users/test/.zshrc"))
-        ],
-        missingPaths: [
-            URL(fileURLWithPath: "/Users/test/.bashrc"),
-            URL(fileURLWithPath: "/Users/test/.bash_profile")
-        ]
-    )
-    return FileListView(selection: .env(category))
-        .environmentObject(appViewModel)
-        .frame(width: 220, height: 400)
-}

@@ -239,17 +239,6 @@ private struct FormatErrorInfo: Equatable {
     }
 }
 
-// MARK: - Preview
-
-#Preview("有文件 - JSON") {
-    let editorVM = EditorViewModel()
-
-    return EditorToolbarView(
-        editorViewModel: editorVM,
-        onShowSearch: {}
-    )
-    .frame(width: 600)
-}
 
 private extension Color {
     static var editorToolbarBackground: Color {

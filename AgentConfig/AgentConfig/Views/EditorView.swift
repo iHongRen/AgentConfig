@@ -724,9 +724,3 @@ private extension Color {
     }
 }
 
-// MARK: - Preview
-//
-//#Preview("Empty State") {
-//    EditorView(editorViewModel: EditorViewModel())
-//        .frame(width: 700, height: 500)
-//}

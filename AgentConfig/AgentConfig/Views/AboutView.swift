@@ -318,8 +318,3 @@ private struct ShortcutRowView: View {
     }
 }
 
-// MARK: - Preview
-
-#Preview {
-    AboutView()
-}

@@ -107,9 +107,3 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - Preview
-
-#Preview {
-    SettingsView()
-        .environmentObject(AppViewModel())
-}

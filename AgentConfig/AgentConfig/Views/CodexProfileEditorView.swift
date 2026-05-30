@@ -9,33 +9,59 @@ import AppKit
 struct CodexProfileEditorView: View {
 
     @ObservedObject var viewModel: CodexProfileViewModel
+    @Environment(\.colorScheme) private var colorScheme
 
-    @State private var isShowingPreview = false
     @State private var toastMessage: String?
     @State private var toastTask: Task<Void, Never>?
+    @State private var measuredEditorHeights: [ProfileCodeField: CGFloat] = [:]
+    @State private var customEditorHeights: [ProfileCodeField: CGFloat] = [:]
+    @State private var resizeStartHeights: [ProfileCodeField: CGFloat] = [:]
+    @State private var resizingFields: Set<ProfileCodeField> = []
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-
             if let profile = viewModel.selectedProfile {
+                profileToolbar(profile: profile)
+
                 ScrollView {
-                    VStack(spacing: 14) {
-                        codeCard(title: "~/.codex/config.toml", text: configBinding(for: profile.id))
-                        codeCard(title: "~/.codex/auth.json", text: authBinding(for: profile.id))
-                        codeCard(title: "~/.zshrc", text: zshrcBinding(for: profile.id))
+                    VStack(spacing: 12) {
+                        codeCard(
+                            title: "~/.codex/config.toml",
+                            language: "TOML",
+                            icon: "gearshape",
+                            fileType: .toml,
+                            field: .config,
+                            textValue: profile.configText,
+                            text: configBinding(for: profile.id)
+                        )
+
+                        codeCard(
+                            title: "~/.codex/auth.json",
+                            language: "JSON",
+                            icon: "curlybraces",
+                            fileType: .json,
+                            field: .auth,
+                            textValue: profile.authText,
+                            text: authBinding(for: profile.id)
+                        )
+
+                        codeCard(
+                            title: "~/.zshrc",
+                            language: "Shell",
+                            icon: "terminal",
+                            fileType: .shell,
+                            field: .zshrc,
+                            textValue: profile.zshrcText,
+                            text: zshrcBinding(for: profile.id)
+                        )
                     }
-                    .padding(16)
+                    .padding(14)
                 }
-                footer(profile: profile)
             } else {
                 emptyState
             }
         }
         .background(Color(nsColor: .textBackgroundColor))
-        .sheet(isPresented: $isShowingPreview) {
-            previewSheet
-        }
         .overlay(alignment: .bottom) {
             if let toastMessage {
                 Text(toastMessage)
@@ -44,45 +70,115 @@ struct CodexProfileEditorView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
                     .background(Capsule().fill(Color(nsColor: .labelColor).opacity(0.78)))
-                    .padding(.bottom, 48)
+                    .padding(.bottom, 18)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+        }
+        .onChange(of: viewModel.selectedProfileID) { _, _ in
+            measuredEditorHeights = [:]
+            customEditorHeights = [:]
+            resizeStartHeights = [:]
+            resizingFields = []
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Codex Profile")
-                    .font(.system(size: 18, weight: .semibold))
-                Text("先预览配置，再应用到 Codex 文件和 .zshrc 托管区块。")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
+    private func profileToolbar(profile: CodexProfile) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                )
 
-            Spacer()
+            TextField("配置名称", text: nameBinding(for: profile.id))
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 13, weight: .medium))
+                .frame(minWidth: 180, idealWidth: 280, maxWidth: 360)
 
-            if let profile = viewModel.selectedProfile {
-                TextField("配置名称", text: nameBinding(for: profile.id))
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 240)
+            statusPill(for: profile)
+
+            Spacer(minLength: 12)
+
+            Button {
+                Task {
+                    let success = await viewModel.applySelected()
+                    showToast(success ? "已应用配置" : (viewModel.lastErrorMessage ?? "应用失败"))
+                }
+            } label: {
+                Label("应用", systemImage: "checkmark.circle")
+                    .labelStyle(.titleAndIcon)
             }
+            .buttonStyle(.borderedProminent)
+            .disabled(viewModel.validateSelected() != nil)
+            .help("应用当前配置")
         }
-        .padding(.horizontal, 16)
-        .frame(height: 64)
+        .padding(.horizontal, 12)
+        .frame(height: 48)
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay(Divider(), alignment: .bottom)
     }
 
-    private func codeCard(title: String, text: Binding<String>) -> some View {
+    private func statusPill(for profile: CodexProfile) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(profileStateColor(for: profile))
+                .frame(width: 7, height: 7)
+
+            Text(statusText(for: profile))
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .padding(.horizontal, 9)
+        .frame(height: 24)
+        .background(
+            Capsule()
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+    }
+
+    private func codeCard(
+        title: String,
+        language: String,
+        icon: String,
+        fileType: FileType,
+        field: ProfileCodeField,
+        textValue: String,
+        text: Binding<String>
+    ) -> some View {
         VStack(spacing: 0) {
-            HStack {
+            HStack(spacing: 9) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22, height: 22)
+
                 Text(title)
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
-                Spacer()
+                Text(language)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 7)
+                    .frame(height: 20)
+                    .background(
+                        Capsule()
+                            .fill(Color(nsColor: .controlBackgroundColor))
+                    )
+
+                Text("\(lineCount(in: text.wrappedValue)) 行")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+
+                Spacer(minLength: 10)
 
                 Button {
                     NSPasteboard.general.clearContents()
@@ -90,57 +186,71 @@ struct CodexProfileEditorView: View {
                     showToast("已复制当前配置片段")
                 } label: {
                     Image(systemName: "doc.on.doc")
+                        .font(.system(size: 12, weight: .semibold))
                         .frame(width: 26, height: 26)
                 }
                 .buttonStyle(.plain)
                 .help("复制")
             }
             .padding(.horizontal, 12)
-            .frame(height: 36)
+            .frame(height: 38)
             .background(Color(nsColor: .windowBackgroundColor))
 
-            TextEditor(text: text)
-                .font(.system(size: 13, design: .monospaced))
-                .scrollContentBackground(.hidden)
-                .background(Color(nsColor: .textBackgroundColor))
-                .frame(minHeight: 150)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
+            Divider()
+
+            HighlightedProfileCodeEditor(
+                text: text,
+                measuredHeight: measuredHeightBinding(for: field),
+                fileType: fileType,
+                isDarkMode: colorScheme == .dark,
+                shouldMeasureHeight: customEditorHeights[field] == nil && !resizingFields.contains(field)
+            )
+            .frame(height: editorHeight(for: field))
+            .background(Color(nsColor: .textBackgroundColor))
         }
         .background(Color(nsColor: .textBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.8))
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.75))
         )
+        .overlay(alignment: .bottom) {
+            resizeHitArea(for: field)
+        }
+        .onAppear {
+            if measuredEditorHeights[field] == nil {
+                measuredEditorHeights[field] = estimatedEditorHeight(for: textValue)
+            }
+        }
     }
 
-    private func footer(profile: CodexProfile) -> some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(profile.isDirty ? Color.orange : (profile.isActive ? Color.green : Color.secondary))
-                .frame(width: 9, height: 9)
-
-            Text(statusText(for: profile))
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-
-            Spacer()
-
-            Button("Preview Changes") {
-                isShowingPreview = true
-            }
-
-            Button("Apply Profile") {
-                isShowingPreview = true
-            }
-            .buttonStyle(.borderedProminent)
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 48)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .overlay(Divider(), alignment: .top)
+    private func resizeHitArea(for field: ProfileCodeField) -> some View {
+        Rectangle()
+            .fill(Color.clear)
+            .frame(height: 10)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    if resizeStartHeights[field] == nil {
+                        resizeStartHeights[field] = editorHeight(for: field)
+                    }
+                    resizingFields.insert(field)
+                    let startHeight = resizeStartHeights[field] ?? editorHeight(for: field)
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
+                        customEditorHeights[field] = ProfileEditorSizing.clampedCustomHeight(
+                            startHeight + value.translation.height
+                        )
+                    }
+                }
+                .onEnded { _ in
+                    resizeStartHeights[field] = nil
+                    resizingFields.remove(field)
+                }
+        )
+        .help("拖动底部边缘调整高度")
     }
 
     private var emptyState: some View {
@@ -148,72 +258,12 @@ struct CodexProfileEditorView: View {
             Image(systemName: "rectangle.stack")
                 .font(.system(size: 42))
                 .foregroundStyle(.tertiary)
-            Text("选择左侧 Codex Profile")
+            Text("选择左侧配置")
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var previewSheet: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("预览将要应用的配置")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                Text("会写入 Codex 配置文件，并替换 .zshrc 中 AgentConfig 管理的区块。")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(18)
-
-            List(viewModel.previewItems) { item in
-                HStack(spacing: 10) {
-                    Image(systemName: "doc.text")
-                        .foregroundStyle(.secondary)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(item.path)
-                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                        Text("\(item.lineCount) 行，\(item.action)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                }
-            }
-            .frame(minHeight: 180)
-
-            if let error = viewModel.validateSelected() {
-                Text(error)
-                    .font(.callout)
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 18)
-                    .padding(.bottom, 8)
-            }
-
-            HStack {
-                Button("取消") {
-                    isShowingPreview = false
-                }
-
-                Spacer()
-
-                Button("确认应用") {
-                    Task {
-                        let success = await viewModel.applySelected()
-                        isShowingPreview = false
-                        showToast(success ? "已应用 Codex Profile" : (viewModel.lastErrorMessage ?? "应用失败"))
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(viewModel.validateSelected() != nil)
-            }
-            .padding(18)
-        }
-        .frame(width: 560, height: 420)
     }
 
     private func nameBinding(for id: UUID) -> Binding<String> {
@@ -248,14 +298,60 @@ struct CodexProfileEditorView: View {
         )
     }
 
+    private func measuredHeightBinding(for field: ProfileCodeField) -> Binding<CGFloat> {
+        Binding(
+            get: { measuredEditorHeights[field] ?? ProfileEditorSizing.fallbackHeight },
+            set: { newHeight in
+                guard customEditorHeights[field] == nil,
+                      !resizingFields.contains(field) else { return }
+
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    measuredEditorHeights[field] = newHeight
+                }
+            }
+        )
+    }
+
+    private func editorHeight(for field: ProfileCodeField) -> CGFloat {
+        if let customHeight = customEditorHeights[field] {
+            return ProfileEditorSizing.clampedCustomHeight(customHeight)
+        }
+
+        let measuredHeight = measuredEditorHeights[field] ?? ProfileEditorSizing.fallbackHeight
+        return ProfileEditorSizing.clampedDefaultHeight(measuredHeight)
+    }
+
     private func statusText(for profile: CodexProfile) -> String {
         if profile.isDirty {
-            return "「\(profile.name)」有未应用修改。"
+            return "未应用修改"
         }
         if profile.isActive {
-            return "「\(profile.name)」是当前已应用 Profile。"
+            return "当前生效"
         }
-        return "正在预览「\(profile.name)」。"
+        return "可应用"
+    }
+
+    private func profileStateColor(for profile: CodexProfile) -> Color {
+        if profile.isDirty {
+            return .orange
+        }
+        if profile.isActive {
+            return .green
+        }
+        return .secondary
+    }
+
+    private func lineCount(in text: String) -> Int {
+        max(1, text.split(separator: "\n", omittingEmptySubsequences: false).count)
+    }
+
+    private func estimatedEditorHeight(for text: String) -> CGFloat {
+        let lineHeight: CGFloat = 17
+        let verticalPadding: CGFloat = 34
+        let height = CGFloat(lineCount(in: text)) * lineHeight + verticalPadding
+        return ProfileEditorSizing.clampedDefaultHeight(height)
     }
 
     private func showToast(_ message: String) {
@@ -272,5 +368,290 @@ struct CodexProfileEditorView: View {
                 }
             }
         }
+    }
+}
+
+private enum ProfileCodeField: Hashable {
+    case config
+    case auth
+    case zshrc
+}
+
+private enum ProfileEditorSizing {
+    static let minimumHeight: CGFloat = 118
+    static let fallbackHeight: CGFloat = 180
+    static let maximumDefaultHeight: CGFloat = 460
+    static let maximumCustomHeight: CGFloat = 900
+
+    static func clampedDefaultHeight(_ height: CGFloat) -> CGFloat {
+        min(max(height, minimumHeight), maximumDefaultHeight)
+    }
+
+    static func clampedCustomHeight(_ height: CGFloat) -> CGFloat {
+        min(max(height, minimumHeight), maximumCustomHeight)
+    }
+}
+
+private struct HighlightedProfileCodeEditor: NSViewRepresentable {
+
+    @Binding var text: String
+    @Binding var measuredHeight: CGFloat
+    let fileType: FileType
+    let isDarkMode: Bool
+    let shouldMeasureHeight: Bool
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: HighlightedProfileCodeEditor
+        var highlighter: SyntaxHighlighter?
+        var isUpdatingFromSwiftUI = false
+        var isComposingMarkedText = false
+        var lastHighlightedFileType: FileType?
+        var lastHighlightedIsDarkMode: Bool?
+        var lastMeasuredTextHash: Int?
+        var pendingHighlightTask: Task<Void, Never>?
+
+        init(_ parent: HighlightedProfileCodeEditor) {
+            self.parent = parent
+        }
+
+        deinit {
+            pendingHighlightTask?.cancel()
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard !isUpdatingFromSwiftUI,
+                  let textView = notification.object as? NSTextView else { return }
+
+            if textView.hasMarkedText() {
+                isComposingMarkedText = true
+                scheduleHeightMeasurement(for: textView)
+                return
+            }
+
+            let finishedMarkedText = isComposingMarkedText
+            isComposingMarkedText = false
+
+            if parent.text != textView.string {
+                parent.text = textView.string
+            }
+
+            if finishedMarkedText {
+                scheduleHighlighting(for: textView)
+            } else {
+                scheduleHighlighting(for: textView)
+            }
+            scheduleHeightMeasurement(for: textView)
+        }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+
+            if isComposingMarkedText && !textView.hasMarkedText() {
+                isComposingMarkedText = false
+                if parent.text != textView.string {
+                    parent.text = textView.string
+                }
+                scheduleHighlighting(for: textView)
+                scheduleHeightMeasurement(for: textView)
+            }
+        }
+
+        func scheduleHighlighting(for textView: NSTextView) {
+            pendingHighlightTask?.cancel()
+            pendingHighlightTask = Task { [weak self, weak textView] in
+                await Task.yield()
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    guard let self, let textView else { return }
+                    self.applyHighlightingPreservingSelection(in: textView)
+                }
+            }
+        }
+
+        func applyHighlightingPreservingSelection(in textView: NSTextView) {
+            guard !textView.hasMarkedText(), let storage = textView.textStorage else { return }
+
+            let selectedRanges = textView.selectedRanges
+            let length = storage.length
+
+            storage.beginEditing()
+            highlighter?.applyHighlighting(to: storage)
+            storage.endEditing()
+
+            textView.selectedRanges = selectedRanges.map { value in
+                let range = value.rangeValue
+                let location = min(range.location, length)
+                let end = min(range.location + range.length, length)
+                return NSValue(range: NSRange(location: location, length: end - location))
+            }
+        }
+
+        func scheduleHeightMeasurement(for textView: NSTextView) {
+            guard parent.shouldMeasureHeight else { return }
+
+            let textHash = textView.string.hashValue
+            guard lastMeasuredTextHash != textHash else { return }
+
+            lastMeasuredTextHash = textHash
+
+            DispatchQueue.main.async { [weak self, weak textView] in
+                guard let self, let textView else { return }
+                self.measureHeight(for: textView)
+            }
+        }
+
+        private func measureHeight(for textView: NSTextView) {
+            guard let layoutManager = textView.layoutManager,
+                  let textContainer = textView.textContainer else { return }
+
+            layoutManager.ensureLayout(for: textContainer)
+            let usedRect = layoutManager.usedRect(for: textContainer)
+            let verticalInset = textView.textContainerInset.height * 2
+            let naturalHeight = ceil(usedRect.height + verticalInset + 10)
+            let clampedHeight = ProfileEditorSizing.clampedDefaultHeight(naturalHeight)
+
+            if abs(parent.measuredHeight - clampedHeight) > 1 {
+                parent.measuredHeight = clampedHeight
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.borderType = .noBorder
+        scrollView.drawsBackground = true
+        scrollView.backgroundColor = editorBackgroundColor
+
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 100, height: 100))
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        textView.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        textView.backgroundColor = editorBackgroundColor
+        textView.drawsBackground = true
+        textView.textColor = editorTextColor
+        textView.insertionPointColor = editorTextColor
+        textView.textContainerInset = NSSize(width: 13, height: 11)
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.allowsUndo = true
+        textView.isRichText = false
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isAutomaticSpellingCorrectionEnabled = false
+        textView.isGrammarCheckingEnabled = false
+        textView.isContinuousSpellCheckingEnabled = false
+        textView.delegate = context.coordinator
+
+        scrollView.documentView = textView
+
+        context.coordinator.highlighter = SyntaxHighlighter(fileType: fileType, isDarkMode: isDarkMode)
+        textView.textStorage?.delegate = context.coordinator.highlighter
+        textView.string = text
+        textView.textStorage?.delegate = context.coordinator.highlighter
+        textView.typingAttributes = typingAttributes
+
+        if let storage = textView.textStorage, storage.length > 0 {
+            storage.beginEditing()
+            context.coordinator.highlighter?.applyHighlighting(to: storage)
+            storage.endEditing()
+        }
+
+        context.coordinator.lastHighlightedFileType = fileType
+        context.coordinator.lastHighlightedIsDarkMode = isDarkMode
+        context.coordinator.scheduleHeightMeasurement(for: textView)
+
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = scrollView.documentView as? NSTextView else { return }
+
+        context.coordinator.parent = self
+
+        let isComposingMarkedText = textView.hasMarkedText() || context.coordinator.isComposingMarkedText
+        let contentChanged = !isComposingMarkedText
+            && !context.coordinator.isUpdatingFromSwiftUI
+            && textView.string != text
+        let fileTypeChanged = context.coordinator.lastHighlightedFileType != fileType
+        let darkModeChanged = context.coordinator.lastHighlightedIsDarkMode != isDarkMode
+
+        if context.coordinator.highlighter == nil {
+            context.coordinator.highlighter = SyntaxHighlighter(fileType: fileType, isDarkMode: isDarkMode)
+            textView.textStorage?.delegate = context.coordinator.highlighter
+        }
+
+        context.coordinator.highlighter?.fileType = fileType
+        context.coordinator.highlighter?.isDarkMode = isDarkMode
+
+        if contentChanged {
+            context.coordinator.isUpdatingFromSwiftUI = true
+            let selectedRanges = textView.selectedRanges
+
+            textView.string = text
+            textView.textStorage?.delegate = context.coordinator.highlighter
+            textView.typingAttributes = typingAttributes
+
+            let length = (text as NSString).length
+            textView.selectedRanges = selectedRanges.map { value in
+                let range = value.rangeValue
+                let location = min(range.location, length)
+                let end = min(range.location + range.length, length)
+                return NSValue(range: NSRange(location: location, length: end - location))
+            }
+            context.coordinator.isUpdatingFromSwiftUI = false
+        }
+
+        textView.backgroundColor = editorBackgroundColor
+        textView.insertionPointColor = editorTextColor
+        textView.typingAttributes = typingAttributes
+        scrollView.backgroundColor = editorBackgroundColor
+
+        if !isComposingMarkedText && (contentChanged || fileTypeChanged || darkModeChanged) {
+            context.coordinator.applyHighlightingPreservingSelection(in: textView)
+            context.coordinator.lastHighlightedFileType = fileType
+            context.coordinator.lastHighlightedIsDarkMode = isDarkMode
+        }
+
+        if context.coordinator.lastHighlightedFileType == nil {
+            context.coordinator.lastHighlightedFileType = fileType
+        }
+        if context.coordinator.lastHighlightedIsDarkMode == nil {
+            context.coordinator.lastHighlightedIsDarkMode = isDarkMode
+        }
+
+        context.coordinator.scheduleHeightMeasurement(for: textView)
+    }
+
+    private var typingAttributes: [NSAttributedString.Key: Any] {
+        [
+            .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular),
+            .foregroundColor: editorTextColor
+        ]
+    }
+
+    private var editorBackgroundColor: NSColor {
+        isDarkMode ? NSColor(white: 0.12, alpha: 1) : NSColor(white: 0.985, alpha: 1)
+    }
+
+    private var editorTextColor: NSColor {
+        isDarkMode ? NSColor(white: 0.92, alpha: 1) : NSColor(white: 0.10, alpha: 1)
     }
 }

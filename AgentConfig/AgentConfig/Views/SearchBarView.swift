@@ -224,23 +224,3 @@ struct SearchBarView: View {
     }
 }
 
-// MARK: - Preview
-
-#Preview {
-    struct PreviewWrapper: View {
-        @State private var isVisible = true
-        @StateObject private var viewModel = EditorViewModel()
-
-        var body: some View {
-            VStack(spacing: 0) {
-                SearchBarView(isVisible: $isVisible, viewModel: viewModel)
-                Spacer()
-            }
-            .frame(width: 700, height: 200)
-            .onAppear {
-                viewModel.content = "Hello World\nhello swift\nHELLO MACOS"
-            }
-        }
-    }
-    return PreviewWrapper()
-}

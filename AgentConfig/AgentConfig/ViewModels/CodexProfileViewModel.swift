@@ -14,6 +14,7 @@ final class CodexProfileViewModel: ObservableObject {
     @Published var lastAppliedProfileName: String?
 
     private let service: CodexProfileServiceProtocol
+    private var persistTask: Task<Void, Never>?
 
     init(service: CodexProfileServiceProtocol? = nil) {
         self.service = service ?? CodexProfileService()
@@ -23,27 +24,6 @@ final class CodexProfileViewModel: ObservableObject {
     var selectedProfile: CodexProfile? {
         guard let selectedProfileID else { return nil }
         return profiles.first { $0.id == selectedProfileID }
-    }
-
-    var previewItems: [CodexProfileApplyPreview] {
-        guard let selectedProfile else { return [] }
-        return [
-            CodexProfileApplyPreview(
-                path: "~/.codex/config.toml",
-                lineCount: lineCount(in: selectedProfile.configText),
-                action: selectedProfile.appliedConfigText.isEmpty ? "创建/更新" : "更新内容"
-            ),
-            CodexProfileApplyPreview(
-                path: "~/.codex/auth.json",
-                lineCount: lineCount(in: selectedProfile.authText),
-                action: selectedProfile.appliedAuthText.isEmpty ? "创建/更新" : "更新内容"
-            ),
-            CodexProfileApplyPreview(
-                path: "~/.zshrc",
-                lineCount: lineCount(in: selectedProfile.zshrcText),
-                action: selectedProfile.appliedZshrcText.isEmpty ? "创建/更新" : "更新托管区块"
-            )
-        ]
     }
 
     func loadProfiles() async {
@@ -59,21 +39,39 @@ final class CodexProfileViewModel: ObservableObject {
     }
 
     func selectProfile(_ profile: CodexProfile) {
+        guard selectedProfileID != profile.id else { return }
         selectedProfileID = profile.id
     }
 
     func clearSelection() {
+        guard selectedProfileID != nil else { return }
         selectedProfileID = nil
     }
 
     func updateSelected(name: String? = nil, configText: String? = nil, authText: String? = nil, zshrcText: String? = nil) {
         guard let index = selectedIndex else { return }
-        if let name { profiles[index].name = name }
-        if let configText { profiles[index].configText = configText }
-        if let authText { profiles[index].authText = authText }
-        if let zshrcText { profiles[index].zshrcText = zshrcText }
+        var didChange = false
+
+        if let name, profiles[index].name != name {
+            profiles[index].name = name
+            didChange = true
+        }
+        if let configText, profiles[index].configText != configText {
+            profiles[index].configText = configText
+            didChange = true
+        }
+        if let authText, profiles[index].authText != authText {
+            profiles[index].authText = authText
+            didChange = true
+        }
+        if let zshrcText, profiles[index].zshrcText != zshrcText {
+            profiles[index].zshrcText = zshrcText
+            didChange = true
+        }
+
+        guard didChange else { return }
         profiles[index].isDirty = true
-        Task { await persistProfiles() }
+        schedulePersistProfiles()
     }
 
     func addProfile() {
@@ -155,7 +153,13 @@ final class CodexProfileViewModel: ObservableObject {
         }
     }
 
-    private func lineCount(in text: String) -> Int {
-        max(1, text.split(separator: "\n", omittingEmptySubsequences: false).count)
+    private func schedulePersistProfiles() {
+        persistTask?.cancel()
+        persistTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard !Task.isCancelled else { return }
+            await self?.persistProfiles()
+        }
     }
+
 }

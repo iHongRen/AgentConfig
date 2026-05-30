@@ -146,7 +146,9 @@ struct SidebarView: View {
 
                 Button {
                     codexProfileViewModel.addProfile()
-                    appViewModel.selectedFile = nil
+                    if appViewModel.selectedFile != nil {
+                        appViewModel.selectedFile = nil
+                    }
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .bold))
@@ -177,7 +179,10 @@ struct SidebarView: View {
 
     private func codexProfileRow(_ profile: CodexProfile) -> some View {
         Button {
-            appViewModel.selectedFile = nil
+            guard codexProfileViewModel.selectedProfileID != profile.id || appViewModel.selectedFile != nil else { return }
+            if appViewModel.selectedFile != nil {
+                appViewModel.selectedFile = nil
+            }
             codexProfileViewModel.selectProfile(profile)
         } label: {
             HStack(spacing: 10) {
@@ -219,6 +224,7 @@ struct SidebarView: View {
 
     private func fileRow(_ file: ConfigFile) -> some View {
         Button {
+            guard appViewModel.selectedFile?.url != file.url || codexProfileViewModel.selectedProfileID != nil else { return }
             codexProfileViewModel.clearSelection()
             appViewModel.selectedFile = file
         } label: {
@@ -341,10 +347,14 @@ struct SidebarView: View {
         Binding(
             get: { expandedAgentIDs.contains(id) },
             set: { isExpanded in
-                if isExpanded {
-                    expandedAgentIDs.insert(id)
-                } else {
-                    expandedAgentIDs.remove(id)
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    if isExpanded {
+                        expandedAgentIDs.insert(id)
+                    } else {
+                        expandedAgentIDs.remove(id)
+                    }
                 }
             }
         )
@@ -469,13 +479,18 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Button {
-                isExpanded.toggle()
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    isExpanded.toggle()
+                }
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .animation(nil, value: isExpanded)
                         .frame(width: 14)
 
                     ZStack {
@@ -577,16 +592,5 @@ private extension View {
 private extension Color {
     static var agentSidebarBackground: Color {
         Color(nsColor: .windowBackgroundColor)
-    }
-}
-
-#Preview {
-    let viewModel = AppViewModel()
-    let codexProfileViewModel = CodexProfileViewModel()
-    NavigationSplitView {
-        SidebarView(codexProfileViewModel: codexProfileViewModel)
-            .environmentObject(viewModel)
-    } detail: {
-        Text("编辑器")
     }
 }

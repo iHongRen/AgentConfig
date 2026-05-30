@@ -79,10 +79,3 @@ struct CodexProfile: Identifiable, Codable, Equatable {
         ]
     }
 }
-
-struct CodexProfileApplyPreview: Identifiable, Equatable {
-    let id = UUID()
-    let path: String
-    let lineCount: Int
-    let action: String
-}
