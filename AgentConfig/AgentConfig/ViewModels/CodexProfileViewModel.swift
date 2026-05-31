@@ -8,6 +8,8 @@ import Foundation
 
 final class CodexProfileViewModel: ObservableObject {
 
+    private static let profileNameMaxLength = 10
+
     @Published var profiles: [CodexProfile] = []
     @Published var selectedProfileID: UUID?
     @Published var lastErrorMessage: String?
@@ -53,7 +55,7 @@ final class CodexProfileViewModel: ObservableObject {
         var didChange = false
 
         if let name {
-            let truncatedName = String(name.prefix(15))
+            let truncatedName = String(name.prefix(Self.profileNameMaxLength))
             if profiles[index].name != truncatedName {
                 profiles[index].name = truncatedName
                 didChange = true

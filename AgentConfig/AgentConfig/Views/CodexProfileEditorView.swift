@@ -20,6 +20,8 @@ struct CodexProfileEditorView: View {
     @State private var pendingDeleteProfile: CodexProfile?
     @State private var editingProfileName: String = ""
 
+    private let profileNameMaxLength = 15
+
     var body: some View {
         VStack(spacing: 0) {
             if let profile = viewModel.selectedProfile {
@@ -64,6 +66,10 @@ struct CodexProfileEditorView: View {
             }
         }
         .background(Color(nsColor: .textBackgroundColor))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            dismissAllInputsFocus()
+        }
         .overlay(alignment: .bottom) {
             if let toastMessage {
                 Text(toastMessage)
@@ -106,33 +112,36 @@ struct CodexProfileEditorView: View {
             Button {
                 isNameFieldFocused = true
             } label: {
-                HStack(spacing: 20) {
+                HStack(spacing: 0) {
                     TextField("配置名称", text: $editingProfileName)
                         .textFieldStyle(.plain)
                         .font(.system(size: 13, weight: .semibold))
                         .focused($isNameFieldFocused)
                         .frame(width: profileNameFieldWidth(for: editingProfileName), alignment: .leading)
                         .onChange(of: editingProfileName) { _, newValue in
-                            let truncated = String(newValue.prefix(15))
+                            let truncated = String(newValue.prefix(profileNameMaxLength))
                             if truncated != newValue {
                                 editingProfileName = truncated
                             }
                             viewModel.updateSelected(name: truncated)
                         }
                         .onSubmit {
-                            let truncated = String(editingProfileName.prefix(15))
+                            let truncated = String(editingProfileName.prefix(profileNameMaxLength))
                             if truncated != editingProfileName {
                                 editingProfileName = truncated
                             }
                             viewModel.updateSelected(name: truncated)
+                            dismissAllInputsFocus()
                         }
 
-                    Image(systemName: "square.and.pencil")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                    if !isNameFieldFocused {
+                        Image(systemName: "square.and.pencil")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .padding(.horizontal, 14)
-                .frame(minWidth: 160, alignment: .leading)
+                .frame(minWidth: 50, alignment: .leading)
                 .frame(height: 34)
                 .background(
                     RoundedRectangle(cornerRadius: 10)
@@ -142,9 +151,9 @@ struct CodexProfileEditorView: View {
             }
             .buttonStyle(.plain)
 
-            statusPill(for: profile)
-
             Spacer(minLength: 12)
+
+            statusPill(for: profile)
 
             Button(role: .destructive) {
                 pendingDeleteProfile = profile
@@ -154,13 +163,13 @@ struct CodexProfileEditorView: View {
                     .foregroundStyle(.white)
                     .frame(width: 18, height: 18)
                     .frame(width: 44, height: 34)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(deleteButtonBackgroundColor)
+                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 10))
             }
             .buttonStyle(.plain)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(deleteButtonBackgroundColor)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 10))
             .disabled(viewModel.profiles.count <= 1)
             .opacity(viewModel.profiles.count <= 1 ? 0.45 : 1)
             .help("删除当前配置")
@@ -176,13 +185,13 @@ struct CodexProfileEditorView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 86, height: 34)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(applyButtonBackgroundColor)
+                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 10))
             }
             .buttonStyle(.plain)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(applyButtonBackgroundColor)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 10))
             .disabled(viewModel.validateSelected() != nil)
             .opacity(viewModel.validateSelected() != nil ? 0.55 : 1)
             .help("应用当前配置")
@@ -223,12 +232,7 @@ struct CodexProfileEditorView: View {
         text: Binding<String>
     ) -> some View {
         VStack(spacing: 0) {
-            HStack(spacing: 9) {
-                Image(systemName: icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 22, height: 22)
-
+            HStack(spacing: 8) {
                 Text(title)
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.primary)
@@ -236,13 +240,13 @@ struct CodexProfileEditorView: View {
                     .truncationMode(.middle)
 
                 Text(language)
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 7)
-                    .frame(height: 20)
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(languageTagStyle(for: field).foreground)
+                    .padding(.horizontal, 8)
+                    .frame(height: 18)
                     .background(
                         Capsule()
-                            .fill(Color(nsColor: .controlBackgroundColor))
+                            .fill(languageTagStyle(for: field).background)
                     )
 
                 Text("\(lineCount(in: text.wrappedValue)) 行")
@@ -250,22 +254,21 @@ struct CodexProfileEditorView: View {
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
 
-                Spacer(minLength: 10)
+                Spacer(minLength: 8)
 
-                Button {
+                Button("复制") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(text.wrappedValue, forType: .string)
                     showToast("已复制当前配置片段")
-                } label: {
-                    Image(systemName: "doc.on.doc")
-                        .font(.system(size: 12, weight: .semibold))
-                        .frame(width: 26, height: 26)
                 }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Color(red: 0.6, green: 0.6, blue: 0.6))
+                .frame(height: 24)
                 .buttonStyle(.plain)
                 .help("复制")
             }
             .padding(.horizontal, 12)
-            .frame(height: 38)
+            .frame(height: 32)
             .background(Color(nsColor: .windowBackgroundColor))
 
             Divider()
@@ -336,14 +339,16 @@ struct CodexProfileEditorView: View {
                 viewModel.profiles.first { $0.id == id }?.name ?? ""
             },
             set: { newValue in
-                viewModel.updateSelected(name: String(newValue.prefix(15)))
+                viewModel.updateSelected(name: String(newValue.prefix(profileNameMaxLength)))
             }
         )
     }
 
     private func profileNameFieldWidth(for name: String) -> CGFloat {
-        let count = max(name.isEmpty ? 4 : name.count, 4)
-        return min(max(CGFloat(count) * 15, 92), 240)
+        let displayText = name.isEmpty ? "配置名称" : name
+        let font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+        let measuredWidth = ceil((displayText as NSString).size(withAttributes: [.font: font]).width)
+        return min(max(measuredWidth + 10, 50), 240)
     }
 
     private var nameFieldBackgroundColor: Color {
@@ -351,7 +356,7 @@ struct CodexProfileEditorView: View {
     }
 
     private var deleteButtonBackgroundColor: Color {
-        Color(red: 0.72, green: 0.28, blue: 0.33)
+        Color(red: 0.84, green: 0.16, blue: 0.20)
     }
 
     private var applyButtonBackgroundColor: Color {
@@ -424,6 +429,20 @@ struct CodexProfileEditorView: View {
         return .secondary
     }
 
+    private func languageTagStyle(for field: ProfileCodeField) -> (foreground: Color, background: Color) {
+        switch field {
+        case .config:
+            let color = Color(red: 0.91, green: 0.49, blue: 0.18)
+            return (color, color.opacity(0.16))
+        case .auth:
+            let color = Color(red: 0.18, green: 0.64, blue: 0.42)
+            return (color, color.opacity(0.16))
+        case .zshrc:
+            let color = Color(red: 0.46, green: 0.40, blue: 0.90)
+            return (color, color.opacity(0.16))
+        }
+    }
+
     private func lineCount(in text: String) -> Int {
         max(1, text.split(separator: "\n", omittingEmptySubsequences: false).count)
     }
@@ -433,6 +452,11 @@ struct CodexProfileEditorView: View {
         let verticalPadding: CGFloat = 34
         let height = CGFloat(lineCount(in: text)) * lineHeight + verticalPadding
         return ProfileEditorSizing.clampedDefaultHeight(height)
+    }
+
+    private func dismissAllInputsFocus() {
+        isNameFieldFocused = false
+        NSApp.keyWindow?.makeFirstResponder(nil)
     }
 
     private func showToast(_ message: String) {
@@ -728,6 +752,7 @@ private struct HighlightedProfileCodeEditor: NSViewRepresentable {
             height: CGFloat.greatestFiniteMagnitude
         )
         textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.lineBreakMode = .byCharWrapping
         textView.textContainer?.containerSize = NSSize(
             width: CGFloat.greatestFiniteMagnitude,
             height: CGFloat.greatestFiniteMagnitude
