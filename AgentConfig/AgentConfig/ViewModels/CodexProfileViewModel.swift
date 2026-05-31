@@ -52,9 +52,12 @@ final class CodexProfileViewModel: ObservableObject {
         guard let index = selectedIndex else { return }
         var didChange = false
 
-        if let name, profiles[index].name != name {
-            profiles[index].name = name
-            didChange = true
+        if let name {
+            let truncatedName = String(name.prefix(15))
+            if profiles[index].name != truncatedName {
+                profiles[index].name = truncatedName
+                didChange = true
+            }
         }
         if let configText, profiles[index].configText != configText {
             profiles[index].configText = configText

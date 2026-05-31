@@ -10,6 +10,7 @@ struct CodexProfileEditorView: View {
 
     @ObservedObject var viewModel: CodexProfileViewModel
     @Environment(\.colorScheme) private var colorScheme
+    @FocusState private var isNameFieldFocused: Bool
 
     @State private var toastMessage: String?
     @State private var toastTask: Task<Void, Never>?
@@ -17,6 +18,7 @@ struct CodexProfileEditorView: View {
     @State private var customEditorHeights: [ProfileCodeField: CGFloat] = [:]
     @State private var resizingFields: Set<ProfileCodeField> = []
     @State private var pendingDeleteProfile: CodexProfile?
+    @State private var editingProfileName: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -78,6 +80,10 @@ struct CodexProfileEditorView: View {
             measuredEditorHeights = [:]
             customEditorHeights = [:]
             resizingFields = []
+            editingProfileName = viewModel.selectedProfile?.name ?? ""
+        }
+        .onAppear {
+            editingProfileName = viewModel.selectedProfile?.name ?? ""
         }
         .alert(item: $pendingDeleteProfile) { profile in
             Alert(
@@ -97,19 +103,44 @@ struct CodexProfileEditorView: View {
 
     private func profileToolbar(profile: CodexProfile) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 28, height: 28)
-                .background(
-                    RoundedRectangle(cornerRadius: 7)
-                        .fill(Color(nsColor: .controlBackgroundColor))
-                )
+            Button {
+                isNameFieldFocused = true
+            } label: {
+                HStack(spacing: 20) {
+                    TextField("配置名称", text: $editingProfileName)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13, weight: .semibold))
+                        .focused($isNameFieldFocused)
+                        .frame(width: profileNameFieldWidth(for: editingProfileName), alignment: .leading)
+                        .onChange(of: editingProfileName) { _, newValue in
+                            let truncated = String(newValue.prefix(15))
+                            if truncated != newValue {
+                                editingProfileName = truncated
+                            }
+                            viewModel.updateSelected(name: truncated)
+                        }
+                        .onSubmit {
+                            let truncated = String(editingProfileName.prefix(15))
+                            if truncated != editingProfileName {
+                                editingProfileName = truncated
+                            }
+                            viewModel.updateSelected(name: truncated)
+                        }
 
-            TextField("配置名称", text: nameBinding(for: profile.id))
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 13, weight: .medium))
-                .frame(minWidth: 180, idealWidth: 280, maxWidth: 360)
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 14)
+                .frame(minWidth: 160, alignment: .leading)
+                .frame(height: 34)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(nameFieldBackgroundColor)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
 
             statusPill(for: profile)
 
@@ -120,10 +151,18 @@ struct CodexProfileEditorView: View {
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 13, weight: .semibold))
-                    .frame(width: 26, height: 26)
+                    .foregroundStyle(.white)
+                    .frame(width: 18, height: 18)
+                    .frame(width: 44, height: 34)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.plain)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(deleteButtonBackgroundColor)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10))
             .disabled(viewModel.profiles.count <= 1)
+            .opacity(viewModel.profiles.count <= 1 ? 0.45 : 1)
             .help("删除当前配置")
 
             Button {
@@ -134,9 +173,18 @@ struct CodexProfileEditorView: View {
             } label: {
                 Label("应用", systemImage: "checkmark.circle")
                     .labelStyle(.titleAndIcon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 86, height: 34)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.plain)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(applyButtonBackgroundColor)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10))
             .disabled(viewModel.validateSelected() != nil)
+            .opacity(viewModel.validateSelected() != nil ? 0.55 : 1)
             .help("应用当前配置")
         }
         .padding(.horizontal, 12)
@@ -288,9 +336,26 @@ struct CodexProfileEditorView: View {
                 viewModel.profiles.first { $0.id == id }?.name ?? ""
             },
             set: { newValue in
-                viewModel.updateSelected(name: newValue)
+                viewModel.updateSelected(name: String(newValue.prefix(15)))
             }
         )
+    }
+
+    private func profileNameFieldWidth(for name: String) -> CGFloat {
+        let count = max(name.isEmpty ? 4 : name.count, 4)
+        return min(max(CGFloat(count) * 15, 92), 240)
+    }
+
+    private var nameFieldBackgroundColor: Color {
+        return Color(nsColor: .controlBackgroundColor).opacity(0.65)
+    }
+
+    private var deleteButtonBackgroundColor: Color {
+        Color(red: 0.72, green: 0.28, blue: 0.33)
+    }
+
+    private var applyButtonBackgroundColor: Color {
+        Color.accentColor
     }
 
     private func configBinding(for id: UUID) -> Binding<String> {

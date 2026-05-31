@@ -78,7 +78,6 @@ struct SidebarView: View {
     private func envSection(_ category: EnvCategory) -> some View {
         SidebarDisclosureSection(
             title: "环境变量",
-            count: category.files.count,
             icon: .systemName("terminal.fill"),
             iconColor: Color(red: 0.22, green: 0.78, blue: 0.20),
             isExpanded: $isEnvExpanded
@@ -108,7 +107,6 @@ struct SidebarView: View {
         ForEach(appViewModel.agentCategories) { category in
             SidebarDisclosureSection(
                 title: category.displayName,
-                count: category.files.count + category.missingPaths.count,
                 icon: .assetName(category.iconName),
                 iconColor: category.iconColor,
                 isExpanded: bindingForAgent(category.id)
@@ -467,7 +465,6 @@ struct SidebarView: View {
 
 private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
     let title: String
-    let count: Int
     let icon: SidebarIcon
     let iconColor: Color
     @Binding var isExpanded: Bool
@@ -476,7 +473,6 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
 
     init(
         title: String,
-        count: Int,
         icon: SidebarIcon,
         iconColor: Color,
         isExpanded: Binding<Bool>,
@@ -484,7 +480,6 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
         @ViewBuilder contextMenu: @escaping () -> Menu = { EmptyView() }
     ) {
         self.title = title
-        self.count = count
         self.icon = icon
         self.iconColor = iconColor
         self._isExpanded = isExpanded
@@ -521,8 +516,6 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .truncationMode(.middle)
-
-                    CountBadge(count: count)
 
                     Spacer(minLength: 4)
                 }
