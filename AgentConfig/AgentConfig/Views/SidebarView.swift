@@ -34,7 +34,7 @@ struct SidebarView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 6) {
                     if let envCategory = appViewModel.envCategory {
                         envSection(envCategory)
                         Divider()
@@ -49,9 +49,8 @@ struct SidebarView: View {
                 .padding(.bottom, 16)
             }
         }
-        .frame(minWidth: 260, idealWidth: 292, maxWidth: 360)
         .background(Color.agentSidebarBackground)
-        .navigationSplitViewColumnWidth(min: 260, ideal: 292, max: 360)
+        .navigationSplitViewColumnWidth(min: 280, ideal: 280, max: 320)
         .alert(item: $deleteTarget) { target in
             switch target {
             case .hideFile(let url):

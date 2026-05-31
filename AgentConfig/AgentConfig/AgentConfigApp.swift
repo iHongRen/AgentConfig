@@ -90,6 +90,7 @@ struct AgentConfigApp: App {
                 editorViewModel.autoSource = newValue
             }
         }
+        .defaultSize(width: 800, height: 640)
         .commands {
             // MARK: About Menu
             CommandGroup(replacing: .appInfo) {
@@ -166,13 +167,17 @@ struct AgentConfigApp: App {
 /// 应用主内容视图，实现三栏 NavigationSplitView 布局
 struct MainContentView: View {
 
+    private let sidebarCollapseThreshold: CGFloat = 760
+
     @ObservedObject var appViewModel: AppViewModel
     @ObservedObject var editorViewModel: EditorViewModel
     @ObservedObject var codexProfileViewModel: CodexProfileViewModel
     @ObservedObject var saveCoordinator: CommandCoordinator
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var windowWidth: CGFloat = .zero
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(codexProfileViewModel: codexProfileViewModel)
                 .environmentObject(appViewModel)
         } detail: {
@@ -185,8 +190,18 @@ struct MainContentView: View {
                 )
             }
         }
-        .navigationSplitViewStyle(.balanced)
-        .frame(minWidth: 980, minHeight: 640)
+        .frame(minWidth: 600, minHeight: 640)
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear {
+                        updateColumnVisibility(for: proxy.size.width)
+                    }
+                    .onChange(of: proxy.size.width) { _, newWidth in
+                        updateColumnVisibility(for: newWidth)
+                    }
+            }
+        )
         .onChange(of: appViewModel.selectedFile) { _, newFile in
             guard let file = newFile else { return }
             codexProfileViewModel.clearSelection()
@@ -197,6 +212,20 @@ struct MainContentView: View {
         // 同步 autoSource 设置
         .onAppear {
             editorViewModel.autoSource = appViewModel.settings.autoSource
+        }
+    }
+
+    private func updateColumnVisibility(for width: CGFloat) {
+        guard abs(windowWidth - width) > 1 else { return }
+        windowWidth = width
+
+        let nextVisibility: NavigationSplitViewVisibility = width < sidebarCollapseThreshold ? .detailOnly : .all
+        guard columnVisibility != nextVisibility else { return }
+
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            columnVisibility = nextVisibility
         }
     }
 }
