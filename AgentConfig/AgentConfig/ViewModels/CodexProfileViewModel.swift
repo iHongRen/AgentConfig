@@ -6,6 +6,13 @@
 import Combine
 import Foundation
 
+struct APIValidationResult {
+    let isValid: Bool
+    let message: String
+    let statusCode: Int?
+    let baseURL: String
+}
+
 final class CodexProfileViewModel: ObservableObject {
 
     private static let profileNameMaxLength = 10
@@ -171,6 +178,110 @@ final class CodexProfileViewModel: ObservableObject {
         }
 
         return nil
+    }
+
+    func validateWithAPI(profile: CodexProfile) async -> APIValidationResult {
+        let zshrcBaseURL = parseZshrcBaseURL(from: profile.zshrcText)
+        let tomlBaseURL = parseTOMLBaseURL(from: profile.configText)
+        let baseURL = zshrcBaseURL ?? tomlBaseURL
+
+        print("[验证] Zshrc base_url: \(zshrcBaseURL ?? "未解析")")
+        print("[验证] TOML base_url: \(tomlBaseURL ?? "未解析")")
+        print("[验证] 实际使用 base_url: \(baseURL ?? "无")")
+
+        guard let baseURL else {
+            print("[验证] 错误: 无法解析 base_url")
+            return APIValidationResult(isValid: false,
+                message: "无法解析 base_url（请检查 config.toml 或 zshrc）",
+                statusCode: nil, baseURL: "")
+        }
+
+        let apiKey = parseAPIKey(from: profile.authText)
+        print("[验证] API Key: \(apiKey != nil ? "已解析 (\(apiKey!.prefix(10))...)" : "未解析")")
+
+        guard let apiKey else {
+            print("[验证] 错误: 无法解析 API 密钥")
+            return APIValidationResult(isValid: false,
+                message: "无法解析 API 密钥",
+                statusCode: nil, baseURL: baseURL)
+        }
+
+        let fullURL = "\(baseURL)/models"
+        print("[验证] 请求 URL: \(fullURL)")
+
+        guard let url = URL(string: fullURL) else {
+            print("[验证] 错误: URL 格式无效 - \(fullURL)")
+            return APIValidationResult(isValid: false,
+                message: "URL 格式无效: \(fullURL)",
+                statusCode: nil, baseURL: baseURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 10
+
+        do {
+            print("[验证] 发送请求...")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let httpResponse = response as? HTTPURLResponse
+            let statusCode = httpResponse?.statusCode ?? 0
+
+            print("[验证] 响应状态码: \(statusCode)")
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("[验证] 响应内容: \(responseString)")
+            }
+
+            if statusCode == 200 {
+                print("[验证] 结果: 成功")
+                return APIValidationResult(isValid: true,
+                    message: "验证成功",
+                    statusCode: statusCode,
+                    baseURL: baseURL)
+            } else {
+                let errorMessage = String(data: data, encoding: .utf8) ?? "未知错误"
+                print("[验证] 结果: 失败 - \(errorMessage)")
+                return APIValidationResult(isValid: false,
+                    message: "验证失败: \(errorMessage)",
+                    statusCode: statusCode,
+                    baseURL: baseURL)
+            }
+        } catch {
+            print("[验证] 连接错误: \(error.localizedDescription)")
+            return APIValidationResult(isValid: false,
+                message: "连接失败: \(error.localizedDescription)",
+                statusCode: nil,
+                baseURL: baseURL)
+        }
+    }
+
+    private func parseZshrcBaseURL(from zshrc: String) -> String? {
+        let pattern = #"export\s+OPENAI_BASE_URL="([^"]+)""#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: zshrc, range: NSRange(zshrc.startIndex..., in: zshrc)),
+              let range = Range(match.range(at: 1), in: zshrc) else {
+            return nil
+        }
+        return String(zshrc[range])
+    }
+
+    private func parseTOMLBaseURL(from toml: String) -> String? {
+        let pattern = #"base_url\s*=\s*"([^"]+)""#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: toml, range: NSRange(toml.startIndex..., in: toml)),
+              let range = Range(match.range(at: 1), in: toml) else {
+            return nil
+        }
+        return String(toml[range])
+    }
+
+    private func parseAPIKey(from json: String) -> String? {
+        guard let data = json.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let apiKey = object["OPENAI_API_KEY"] as? String else {
+            return nil
+        }
+        return apiKey
     }
 
     private func persistProfiles() async {
