@@ -351,7 +351,21 @@ struct CodexProfileEditorView: View {
                 measuredHeight: measuredHeightBinding(for: field),
                 fileType: fileType,
                 isDarkMode: colorScheme == .dark,
-                shouldMeasureHeight: customEditorHeights[field] == nil && !resizingFields.contains(field)
+                shouldMeasureHeight: customEditorHeights[field] == nil && !resizingFields.contains(field),
+                currentHeight: editorHeight(for: field),
+                onResizeStart: {
+                    resizingFields.insert(field)
+                },
+                onResize: { newHeight in
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
+                        customEditorHeights[field] = ProfileEditorSizing.clampedCustomHeight(newHeight)
+                    }
+                },
+                onResizeEnd: {
+                    resizingFields.remove(field)
+                }
             )
             .frame(height: editorHeight(for: field))
             .background(Color(nsColor: .textBackgroundColor))
@@ -362,35 +376,11 @@ struct CodexProfileEditorView: View {
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(Color(nsColor: .separatorColor).opacity(0.75))
         )
-        .overlay(alignment: .bottom) {
-            resizeHitArea(for: field)
-        }
         .onAppear {
             if measuredEditorHeights[field] == nil {
-                measuredEditorHeights[field] = estimatedEditorHeight(for: textValue)
+                measuredEditorHeights[field] = estimatedEditorHeight(for: field, text: textValue)
             }
         }
-    }
-
-    private func resizeHitArea(for field: ProfileCodeField) -> some View {
-        ProfileResizeHandleView(
-            currentHeight: editorHeight(for: field),
-            onResizeStart: {
-                resizingFields.insert(field)
-            },
-            onResize: { newHeight in
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    customEditorHeights[field] = ProfileEditorSizing.clampedCustomHeight(newHeight)
-                }
-            },
-            onResizeEnd: {
-                resizingFields.remove(field)
-            }
-        )
-        .frame(height: ProfileEditorSizing.resizeHandleHeight)
-        .help("拖动底部边缘调整高度")
     }
 
     private var emptyState: some View {
@@ -459,7 +449,7 @@ struct CodexProfileEditorView: View {
 
     private func measuredHeightBinding(for field: ProfileCodeField) -> Binding<CGFloat> {
         Binding(
-            get: { measuredEditorHeights[field] ?? ProfileEditorSizing.fallbackHeight },
+            get: { measuredEditorHeights[field] ?? ProfileEditorSizing.defaultHeight(for: field) },
             set: { newHeight in
                 guard customEditorHeights[field] == nil,
                       !resizingFields.contains(field) else { return }
@@ -478,8 +468,8 @@ struct CodexProfileEditorView: View {
             return ProfileEditorSizing.clampedCustomHeight(customHeight)
         }
 
-        let measuredHeight = measuredEditorHeights[field] ?? ProfileEditorSizing.fallbackHeight
-        return ProfileEditorSizing.clampedDefaultHeight(measuredHeight)
+        let measuredHeight = measuredEditorHeights[field] ?? ProfileEditorSizing.defaultHeight(for: field)
+        return ProfileEditorSizing.defaultHeight(for: field, measuredHeight: measuredHeight)
     }
 
     private func statusText(for profile: CodexProfile) -> String {
@@ -520,11 +510,11 @@ struct CodexProfileEditorView: View {
         max(1, text.split(separator: "\n", omittingEmptySubsequences: false).count)
     }
 
-    private func estimatedEditorHeight(for text: String) -> CGFloat {
+    private func estimatedEditorHeight(for field: ProfileCodeField, text: String) -> CGFloat {
         let lineHeight: CGFloat = 17
         let verticalPadding: CGFloat = 34
         let height = CGFloat(lineCount(in: text)) * lineHeight + verticalPadding
-        return ProfileEditorSizing.clampedDefaultHeight(height)
+        return ProfileEditorSizing.defaultHeight(for: field, measuredHeight: height)
     }
 
     private func dismissAllInputsFocus() {
@@ -553,14 +543,25 @@ private enum ProfileCodeField: Hashable {
     case config
     case auth
     case zshrc
+
+    var defaultHeight: CGFloat {
+        switch self {
+        case .config:
+            return 220
+        case .auth:
+            return 150
+        case .zshrc:
+            return 150
+        }
+    }
 }
 
 private enum ProfileEditorSizing {
     static let minimumHeight: CGFloat = 118
-    static let fallbackHeight: CGFloat = 180
+    static let fallbackHeight: CGFloat = ProfileCodeField.auth.defaultHeight
     static let maximumDefaultHeight: CGFloat = 460
     static let maximumCustomHeight: CGFloat = 900
-    static let resizeHandleHeight: CGFloat = 16
+    static let resizeCursorHotZoneHeight: CGFloat = 14
 
     static func clampedDefaultHeight(_ height: CGFloat) -> CGFloat {
         min(max(height, minimumHeight), maximumDefaultHeight)
@@ -569,112 +570,13 @@ private enum ProfileEditorSizing {
     static func clampedCustomHeight(_ height: CGFloat) -> CGFloat {
         min(max(height, minimumHeight), maximumCustomHeight)
     }
-}
 
-private struct ProfileResizeHandleView: NSViewRepresentable {
-    let currentHeight: CGFloat
-    let onResizeStart: () -> Void
-    let onResize: (CGFloat) -> Void
-    let onResizeEnd: () -> Void
-
-    func makeNSView(context: Context) -> ResizeHandleNSView {
-        let view = ResizeHandleNSView()
-        view.currentHeight = currentHeight
-        view.onResizeStart = onResizeStart
-        view.onResize = onResize
-        view.onResizeEnd = onResizeEnd
-        return view
+    static func defaultHeight(for field: ProfileCodeField) -> CGFloat {
+        clampedDefaultHeight(field.defaultHeight)
     }
 
-    func updateNSView(_ nsView: ResizeHandleNSView, context: Context) {
-        nsView.currentHeight = currentHeight
-        nsView.onResizeStart = onResizeStart
-        nsView.onResize = onResize
-        nsView.onResizeEnd = onResizeEnd
-    }
-
-    final class ResizeHandleNSView: NSView {
-        var currentHeight: CGFloat = ProfileEditorSizing.fallbackHeight
-        var onResizeStart: (() -> Void)?
-        var onResize: ((CGFloat) -> Void)?
-        var onResizeEnd: (() -> Void)?
-
-        private var trackingArea: NSTrackingArea?
-        private var startHeight: CGFloat?
-        private var startMouseY: CGFloat?
-
-        override init(frame frameRect: NSRect) {
-            super.init(frame: frameRect)
-            wantsLayer = true
-        }
-
-        required init?(coder: NSCoder) {
-            fatalError("init(coder:) has not been implemented")
-        }
-
-        override var acceptsFirstResponder: Bool {
-            true
-        }
-
-        override func hitTest(_ point: NSPoint) -> NSView? {
-            bounds.contains(point) ? self : nil
-        }
-
-        override func updateTrackingAreas() {
-            super.updateTrackingAreas()
-
-            if let trackingArea {
-                removeTrackingArea(trackingArea)
-            }
-
-            let area = NSTrackingArea(
-                rect: bounds,
-                options: [.mouseEnteredAndExited, .mouseMoved, .cursorUpdate, .activeInKeyWindow, .inVisibleRect],
-                owner: self,
-                userInfo: nil
-            )
-            addTrackingArea(area)
-            trackingArea = area
-        }
-
-        override func resetCursorRects() {
-            super.resetCursorRects()
-            addCursorRect(bounds, cursor: .resizeUpDown)
-        }
-
-        override func cursorUpdate(with event: NSEvent) {
-            NSCursor.resizeUpDown.set()
-        }
-
-        override func mouseEntered(with event: NSEvent) {
-            NSCursor.resizeUpDown.set()
-        }
-
-        override func mouseMoved(with event: NSEvent) {
-            NSCursor.resizeUpDown.set()
-        }
-
-        override func mouseDown(with event: NSEvent) {
-            window?.makeFirstResponder(self)
-            NSCursor.resizeUpDown.set()
-            startHeight = currentHeight
-            startMouseY = event.locationInWindow.y
-            onResizeStart?()
-        }
-
-        override func mouseDragged(with event: NSEvent) {
-            NSCursor.resizeUpDown.set()
-            guard let startHeight, let startMouseY else { return }
-            let delta = startMouseY - event.locationInWindow.y
-            onResize?(ProfileEditorSizing.clampedCustomHeight(startHeight + delta))
-        }
-
-        override func mouseUp(with event: NSEvent) {
-            startHeight = nil
-            startMouseY = nil
-            NSCursor.resizeUpDown.set()
-            onResizeEnd?()
-        }
+    static func defaultHeight(for field: ProfileCodeField, measuredHeight: CGFloat) -> CGFloat {
+        max(defaultHeight(for: field), clampedDefaultHeight(measuredHeight))
     }
 }
 
@@ -685,6 +587,10 @@ private struct HighlightedProfileCodeEditor: NSViewRepresentable {
     let fileType: FileType
     let isDarkMode: Bool
     let shouldMeasureHeight: Bool
+    let currentHeight: CGFloat
+    let onResizeStart: () -> Void
+    let onResize: (CGFloat) -> Void
+    let onResizeEnd: () -> Void
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: HighlightedProfileCodeEditor
@@ -802,6 +708,158 @@ private struct HighlightedProfileCodeEditor: NSViewRepresentable {
         }
     }
 
+    final class ResizableProfileTextView: NSTextView {
+        var currentHeight: CGFloat = ProfileEditorSizing.fallbackHeight
+        var onResizeStart: (() -> Void)?
+        var onResize: ((CGFloat) -> Void)?
+        var onResizeEnd: (() -> Void)?
+
+        private var trackingArea: NSTrackingArea?
+        private var startHeight: CGFloat?
+        private var startMouseY: CGFloat?
+
+        override init(frame frameRect: NSRect) {
+            super.init(frame: frameRect)
+            configureResizeTracking()
+        }
+
+        override init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
+            super.init(frame: frameRect, textContainer: container)
+            configureResizeTracking()
+        }
+
+        private func configureResizeTracking() {
+            postsFrameChangedNotifications = true
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(viewFrameDidChange),
+                name: NSView.frameDidChangeNotification,
+                object: self
+            )
+        }
+
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        deinit {
+            NotificationCenter.default.removeObserver(self)
+        }
+
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+
+            if let trackingArea {
+                removeTrackingArea(trackingArea)
+            }
+
+            let area = NSTrackingArea(
+                rect: .zero,
+                options: [.mouseEnteredAndExited, .mouseMoved, .cursorUpdate, .activeAlways, .inVisibleRect],
+                owner: self,
+                userInfo: nil
+            )
+            addTrackingArea(area)
+            trackingArea = area
+        }
+
+        override func resetCursorRects() {
+            super.resetCursorRects()
+            addCursorRect(visibleResizeHotZone, cursor: .resizeUpDown)
+        }
+
+        override func cursorUpdate(with event: NSEvent) {
+            if isInResizeHotZone(event) {
+                NSCursor.resizeUpDown.set()
+            } else {
+                super.cursorUpdate(with: event)
+            }
+        }
+
+        override func mouseMoved(with event: NSEvent) {
+            if isInResizeHotZone(event) {
+                NSCursor.resizeUpDown.set()
+            } else {
+                super.mouseMoved(with: event)
+            }
+        }
+
+        override func mouseEntered(with event: NSEvent) {
+            if isInResizeHotZone(event) {
+                NSCursor.resizeUpDown.set()
+            } else {
+                super.mouseEntered(with: event)
+            }
+        }
+
+        override func mouseDown(with event: NSEvent) {
+            guard isInResizeHotZone(event) else {
+                super.mouseDown(with: event)
+                return
+            }
+
+            window?.makeFirstResponder(self)
+            NSCursor.resizeUpDown.set()
+            startHeight = currentHeight
+            startMouseY = event.locationInWindow.y
+            onResizeStart?()
+        }
+
+        override func mouseDragged(with event: NSEvent) {
+            guard let startHeight, let startMouseY else {
+                super.mouseDragged(with: event)
+                return
+            }
+
+            NSCursor.resizeUpDown.set()
+            let delta = startMouseY - event.locationInWindow.y
+            onResize?(ProfileEditorSizing.clampedCustomHeight(startHeight + delta))
+        }
+
+        override func mouseUp(with event: NSEvent) {
+            guard startHeight != nil else {
+                super.mouseUp(with: event)
+                return
+            }
+
+            startHeight = nil
+            startMouseY = nil
+            if isInResizeHotZone(event) {
+                NSCursor.resizeUpDown.set()
+            }
+            onResizeEnd?()
+        }
+
+        private var visibleResizeHotZone: NSRect {
+            let visibleRect = visibleEditorRect
+            let hotZoneHeight = min(ProfileEditorSizing.resizeCursorHotZoneHeight, visibleRect.height)
+            let y = isFlipped ? visibleRect.maxY - hotZoneHeight : visibleRect.minY
+            return NSRect(
+                x: visibleRect.minX,
+                y: y,
+                width: visibleRect.width,
+                height: hotZoneHeight
+            )
+        }
+
+        private var visibleEditorRect: NSRect {
+            guard let clipView = enclosingScrollView?.contentView else {
+                return visibleRect
+            }
+            return convert(clipView.bounds, from: clipView)
+        }
+
+        private func isInResizeHotZone(_ event: NSEvent) -> Bool {
+            let localPoint = convert(event.locationInWindow, from: nil)
+            return visibleResizeHotZone.contains(localPoint)
+        }
+
+        @objc private func viewFrameDidChange() {
+            updateTrackingAreas()
+            window?.invalidateCursorRects(for: self)
+        }
+    }
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
@@ -815,7 +873,11 @@ private struct HighlightedProfileCodeEditor: NSViewRepresentable {
         scrollView.drawsBackground = true
         scrollView.backgroundColor = editorBackgroundColor
 
-        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 100, height: 100))
+        let textView = ResizableProfileTextView(frame: NSRect(x: 0, y: 0, width: 100, height: 100))
+        textView.currentHeight = currentHeight
+        textView.onResizeStart = onResizeStart
+        textView.onResize = onResize
+        textView.onResizeEnd = onResizeEnd
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
@@ -869,9 +931,13 @@ private struct HighlightedProfileCodeEditor: NSViewRepresentable {
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        guard let textView = scrollView.documentView as? NSTextView else { return }
+        guard let textView = scrollView.documentView as? ResizableProfileTextView else { return }
 
         context.coordinator.parent = self
+        textView.currentHeight = currentHeight
+        textView.onResizeStart = onResizeStart
+        textView.onResize = onResize
+        textView.onResizeEnd = onResizeEnd
 
         let isComposingMarkedText = textView.hasMarkedText() || context.coordinator.isComposingMarkedText
         let contentChanged = !isComposingMarkedText
