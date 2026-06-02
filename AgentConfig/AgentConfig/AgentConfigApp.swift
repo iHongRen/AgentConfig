@@ -175,6 +175,7 @@ struct MainContentView: View {
     @ObservedObject var saveCoordinator: CommandCoordinator
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var windowWidth: CGFloat = .zero
+    @State private var hasResolvedInitialPage = false
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -209,9 +210,21 @@ struct MainContentView: View {
                 try? await editorViewModel.load(file: file)
             }
         }
+        .onChange(of: codexProfileViewModel.selectedProfileID) { _, newProfileID in
+            guard hasResolvedInitialPage else { return }
+            guard let newProfileID else { return }
+            appViewModel.persistLastVisitedPage(.codexProfile(id: newProfileID))
+        }
+        .onChange(of: appViewModel.didFinishInitialRefresh) { _, _ in
+            resolveInitialPageIfNeeded()
+        }
+        .onChange(of: codexProfileViewModel.didFinishInitialLoad) { _, _ in
+            resolveInitialPageIfNeeded()
+        }
         // 同步 autoSource 设置
         .onAppear {
             editorViewModel.autoSource = appViewModel.settings.autoSource
+            resolveInitialPageIfNeeded()
         }
     }
 
@@ -226,6 +239,26 @@ struct MainContentView: View {
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             columnVisibility = nextVisibility
+        }
+    }
+
+    private func resolveInitialPageIfNeeded() {
+        guard !hasResolvedInitialPage else { return }
+        guard appViewModel.didFinishInitialRefresh, codexProfileViewModel.didFinishInitialLoad else { return }
+
+        hasResolvedInitialPage = true
+
+        if codexProfileViewModel.restoreInitialSelectionIfNeeded(appViewModel: appViewModel) {
+            appViewModel.selectFile(nil)
+            return
+        }
+
+        if appViewModel.restoreInitialSelectionIfNeeded() != nil {
+            return
+        }
+
+        if let defaultProfileID = codexProfileViewModel.defaultSelectedProfileID() {
+            appViewModel.persistLastVisitedPage(.codexProfile(id: defaultProfileID))
         }
     }
 }

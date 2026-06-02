@@ -47,11 +47,19 @@ final class AppViewModel: ObservableObject {
     /// 是否正在扫描中
     @Published var isScanning: Bool = false
 
+    /// 首次启动扫描是否已完成
+    @Published private(set) var didFinishInitialRefresh: Bool = false
+
     // MARK: - Dependencies
 
     private let scanner: AgentScannerProtocol
     private let fileService: FileServiceProtocol
     private(set) var settings: AppSettings
+    private var hasRestoredInitialSelection = false
+
+    var lastVisitedPage: LastVisitedPage? {
+        settings.lastVisitedPage
+    }
 
     // MARK: - Init
 
@@ -89,6 +97,43 @@ final class AppViewModel: ObservableObject {
         agentCategories = filterHiddenFiles(from: mergeAddedFiles(into: agents))
         envCategory = filterHiddenFiles(from: mergeAddedFiles(into: env))
         customPathGroups = filterHiddenFiles(from: scanCustomPaths())
+        didFinishInitialRefresh = true
+    }
+
+    func selectFile(_ file: ConfigFile?) {
+        selectedFile = file
+
+        if let file {
+            persistLastVisitedPage(.configFile(path: file.url.standardizedFileURL.path))
+        } else if case .configFile = settings.lastVisitedPage {
+            persistLastVisitedPage(nil)
+        }
+    }
+
+    func restoreInitialSelectionIfNeeded() -> ConfigFile? {
+        guard didFinishInitialRefresh, !hasRestoredInitialSelection else { return nil }
+        hasRestoredInitialSelection = true
+
+        guard case .configFile(let path) = settings.lastVisitedPage else { return nil }
+        let standardizedPath = URL(fileURLWithPath: path).standardizedFileURL.path
+
+        let allFiles = (envCategory?.files ?? [])
+            + agentCategories.flatMap(\.files)
+            + customPathGroups.flatMap(\.files)
+
+        guard let matchedFile = allFiles.first(where: { $0.url.standardizedFileURL.path == standardizedPath }) else {
+            persistLastVisitedPage(nil)
+            return nil
+        }
+
+        selectFile(matchedFile)
+        return matchedFile
+    }
+
+    func persistLastVisitedPage(_ page: LastVisitedPage?) {
+        guard settings.lastVisitedPage != page else { return }
+        settings.lastVisitedPage = page
+        settings.save()
     }
 
     // MARK: - Category Files
@@ -225,7 +270,7 @@ final class AppViewModel: ObservableObject {
         settings.save()
         // 如果当前选中的是被隐藏的文件，清除选择
         if selectedFile?.url.standardizedFileURL == standardizedURL {
-            selectedFile = nil
+            selectFile(nil)
         }
         Task { await refresh() }
     }

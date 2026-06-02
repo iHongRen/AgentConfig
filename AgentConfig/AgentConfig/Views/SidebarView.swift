@@ -155,7 +155,7 @@ struct SidebarView: View {
                 Button {
                     codexProfileViewModel.addProfile()
                     if appViewModel.selectedFile != nil {
-                        appViewModel.selectedFile = nil
+                        appViewModel.selectFile(nil)
                     }
                 } label: {
                     Image(systemName: "plus")
@@ -189,7 +189,7 @@ struct SidebarView: View {
         Button {
             guard codexProfileViewModel.selectedProfileID != profile.id || appViewModel.selectedFile != nil else { return }
             if appViewModel.selectedFile != nil {
-                appViewModel.selectedFile = nil
+                appViewModel.selectFile(nil)
             }
             codexProfileViewModel.selectProfile(profile)
         } label: {
@@ -240,7 +240,7 @@ struct SidebarView: View {
         Button {
             guard appViewModel.selectedFile?.url != file.url || codexProfileViewModel.selectedProfileID != nil else { return }
             codexProfileViewModel.clearSelection()
-            appViewModel.selectedFile = file
+            appViewModel.selectFile(file)
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: fileTypeIcon(for: file.fileType))
@@ -405,7 +405,7 @@ struct SidebarView: View {
                 try await fileService.create(at: url)
                 await appViewModel.refresh()
             } catch {
-                appViewModel.selectedFile = nil
+                appViewModel.selectFile(nil)
             }
         }
     }

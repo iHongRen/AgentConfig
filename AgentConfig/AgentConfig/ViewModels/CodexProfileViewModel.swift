@@ -21,9 +21,11 @@ final class CodexProfileViewModel: ObservableObject {
     @Published var selectedProfileID: UUID?
     @Published var lastErrorMessage: String?
     @Published var lastAppliedProfileName: String?
+    @Published private(set) var didFinishInitialLoad: Bool = false
 
     private let service: CodexProfileServiceProtocol
     private var persistTask: Task<Void, Never>?
+    private var hasRestoredInitialSelection = false
 
     init(service: CodexProfileServiceProtocol? = nil) {
         self.service = service ?? CodexProfileService()
@@ -45,6 +47,7 @@ final class CodexProfileViewModel: ObservableObject {
             selectedProfileID = profiles.first?.id
             lastErrorMessage = error.localizedDescription
         }
+        didFinishInitialLoad = true
     }
 
     func selectProfile(_ profile: CodexProfile) {
@@ -52,9 +55,27 @@ final class CodexProfileViewModel: ObservableObject {
         selectedProfileID = profile.id
     }
 
+    func restoreInitialSelectionIfNeeded(appViewModel: AppViewModel) -> Bool {
+        guard didFinishInitialLoad, !hasRestoredInitialSelection else { return false }
+        hasRestoredInitialSelection = true
+
+        guard case .codexProfile(let id) = appViewModel.lastVisitedPage else { return false }
+        guard profiles.contains(where: { $0.id == id }) else {
+            appViewModel.persistLastVisitedPage(nil)
+            return false
+        }
+
+        selectedProfileID = id
+        return true
+    }
+
     func clearSelection() {
         guard selectedProfileID != nil else { return }
         selectedProfileID = nil
+    }
+
+    func defaultSelectedProfileID() -> UUID? {
+        profiles.first(where: \.isActive)?.id ?? profiles.first?.id
     }
 
     func updateSelected(name: String? = nil, configText: String? = nil, authText: String? = nil, zshrcText: String? = nil) {

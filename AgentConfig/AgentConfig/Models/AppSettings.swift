@@ -7,6 +7,47 @@
 
 import Foundation
 
+enum LastVisitedPage: Codable, Equatable {
+    case configFile(path: String)
+    case codexProfile(id: UUID)
+
+    private enum CodingKeys: String, CodingKey {
+        case kind
+        case path
+        case profileID
+    }
+
+    private enum Kind: String, Codable {
+        case configFile
+        case codexProfile
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let kind = try container.decode(Kind.self, forKey: .kind)
+        switch kind {
+        case .configFile:
+            let path = try container.decode(String.self, forKey: .path)
+            self = .configFile(path: path)
+        case .codexProfile:
+            let id = try container.decode(UUID.self, forKey: .profileID)
+            self = .codexProfile(id: id)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .configFile(let path):
+            try container.encode(Kind.configFile, forKey: .kind)
+            try container.encode(path, forKey: .path)
+        case .codexProfile(let id):
+            try container.encode(Kind.codexProfile, forKey: .kind)
+            try container.encode(id, forKey: .profileID)
+        }
+    }
+}
+
 // MARK: - AppearanceMode
 
 /// 应用外观模式
@@ -69,6 +110,9 @@ struct AppSettings: Codable {
     /// 用户手动添加到指定分类的文件路径
     var categoryFilePaths: [String: [URL]] = [:]
 
+    /// 应用上次停留的配置页
+    var lastVisitedPage: LastVisitedPage?
+
     enum CodingKeys: String, CodingKey {
         case autoSource
         case appearanceMode
@@ -76,6 +120,7 @@ struct AppSettings: Codable {
         case customPaths
         case hiddenFilePaths
         case categoryFilePaths
+        case lastVisitedPage
     }
 
     init() {}
@@ -88,6 +133,7 @@ struct AppSettings: Codable {
         customPaths = try container.decodeIfPresent([URL].self, forKey: .customPaths) ?? []
         hiddenFilePaths = try container.decodeIfPresent([URL].self, forKey: .hiddenFilePaths) ?? []
         categoryFilePaths = try container.decodeIfPresent([String: [URL]].self, forKey: .categoryFilePaths) ?? [:]
+        lastVisitedPage = try container.decodeIfPresent(LastVisitedPage.self, forKey: .lastVisitedPage)
     }
 
     // MARK: - UserDefaults Key

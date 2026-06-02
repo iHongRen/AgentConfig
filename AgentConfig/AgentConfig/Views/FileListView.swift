@@ -80,7 +80,7 @@ struct FileListView: View {
     /// 已存在文件的行视图
     private func fileRow(for file: ConfigFile) -> some View {
         Button {
-            appViewModel.selectedFile = file
+            appViewModel.selectFile(file)
         } label: {
             HStack(spacing: 8) {
                 // 文件类型图标
@@ -182,5 +182,4 @@ struct FileListView: View {
         }
     }
 }
-
 
