@@ -87,12 +87,13 @@ struct CodexProfileEditorView: View {
         }
         .onChange(of: viewModel.selectedProfileID) { _, _ in
             measuredEditorHeights = [:]
-            customEditorHeights = [:]
+            customEditorHeights = savedEditorHeights(for: viewModel.selectedProfile)
             resizingFields = []
             editingProfileName = viewModel.selectedProfile?.name ?? ""
         }
         .onAppear {
             editingProfileName = viewModel.selectedProfile?.name ?? ""
+            customEditorHeights = savedEditorHeights(for: viewModel.selectedProfile)
         }
         .alert(item: $pendingDeleteProfile) { profile in
             Alert(
@@ -357,11 +358,13 @@ struct CodexProfileEditorView: View {
                     resizingFields.insert(field)
                 },
                 onResize: { newHeight in
+                    let clampedHeight = ProfileEditorSizing.clampedCustomHeight(newHeight)
                     var transaction = Transaction()
                     transaction.disablesAnimations = true
                     withTransaction(transaction) {
-                        customEditorHeights[field] = ProfileEditorSizing.clampedCustomHeight(newHeight)
+                        customEditorHeights[field] = clampedHeight
                     }
+                    saveEditorHeight(clampedHeight, for: field)
                 },
                 onResizeEnd: {
                     resizingFields.remove(field)
@@ -470,6 +473,34 @@ struct CodexProfileEditorView: View {
 
         let measuredHeight = measuredEditorHeights[field] ?? ProfileEditorSizing.defaultHeight(for: field)
         return ProfileEditorSizing.defaultHeight(for: field, measuredHeight: measuredHeight)
+    }
+
+    private func savedEditorHeights(for profile: CodexProfile?) -> [ProfileCodeField: CGFloat] {
+        guard let profile else { return [:] }
+
+        var heights: [ProfileCodeField: CGFloat] = [:]
+        if let height = profile.configEditorHeight {
+            heights[.config] = ProfileEditorSizing.clampedCustomHeight(CGFloat(height))
+        }
+        if let height = profile.authEditorHeight {
+            heights[.auth] = ProfileEditorSizing.clampedCustomHeight(CGFloat(height))
+        }
+        if let height = profile.zshrcEditorHeight {
+            heights[.zshrc] = ProfileEditorSizing.clampedCustomHeight(CGFloat(height))
+        }
+        return heights
+    }
+
+    private func saveEditorHeight(_ height: CGFloat, for field: ProfileCodeField) {
+        let storedHeight = Double(height)
+        switch field {
+        case .config:
+            viewModel.updateSelectedEditorHeight(configEditorHeight: storedHeight)
+        case .auth:
+            viewModel.updateSelectedEditorHeight(authEditorHeight: storedHeight)
+        case .zshrc:
+            viewModel.updateSelectedEditorHeight(zshrcEditorHeight: storedHeight)
+        }
     }
 
     private func statusText(for profile: CodexProfile) -> String {

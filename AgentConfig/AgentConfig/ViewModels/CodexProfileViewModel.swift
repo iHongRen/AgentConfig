@@ -40,7 +40,11 @@ final class CodexProfileViewModel: ObservableObject {
     func loadProfiles() async {
         do {
             let loadedProfiles = try await service.loadProfiles()
-            profiles = loadedProfiles
+            profiles = loadedProfiles.map { profile in
+                var updatedProfile = profile
+                updatedProfile.isDirty = isProfileDirty(updatedProfile)
+                return updatedProfile
+            }
             selectedProfileID = selectedProfileID ?? loadedProfiles.first(where: \.isActive)?.id ?? loadedProfiles.first?.id
         } catch {
             profiles = CodexProfile.defaultProfiles
@@ -103,7 +107,38 @@ final class CodexProfileViewModel: ObservableObject {
         }
 
         guard didChange else { return }
-        profiles[index].isDirty = true
+        profiles[index].isDirty = isProfileDirty(profiles[index])
+        schedulePersistProfiles()
+    }
+
+    func updateSelectedEditorHeight(
+        configEditorHeight: Double? = nil,
+        authEditorHeight: Double? = nil,
+        zshrcEditorHeight: Double? = nil
+    ) {
+        guard let index = selectedIndex else { return }
+        var didChange = false
+
+        if let configEditorHeight {
+            if profiles[index].configEditorHeight != configEditorHeight {
+                profiles[index].configEditorHeight = configEditorHeight
+                didChange = true
+            }
+        }
+        if let authEditorHeight {
+            if profiles[index].authEditorHeight != authEditorHeight {
+                profiles[index].authEditorHeight = authEditorHeight
+                didChange = true
+            }
+        }
+        if let zshrcEditorHeight {
+            if profiles[index].zshrcEditorHeight != zshrcEditorHeight {
+                profiles[index].zshrcEditorHeight = zshrcEditorHeight
+                didChange = true
+            }
+        }
+
+        guard didChange else { return }
         schedulePersistProfiles()
     }
 
@@ -178,6 +213,32 @@ final class CodexProfileViewModel: ObservableObject {
     private var selectedIndex: Array<CodexProfile>.Index? {
         guard let selectedProfileID else { return nil }
         return profiles.firstIndex { $0.id == selectedProfileID }
+    }
+
+    private func isProfileDirty(_ profile: CodexProfile) -> Bool {
+        normalizedProfileText(profile.configText) != normalizedProfileText(profile.appliedConfigText)
+            || normalizedAuthJSON(profile.authText) != normalizedAuthJSON(profile.appliedAuthText)
+            || normalizedProfileText(profile.zshrcText) != normalizedProfileText(profile.appliedZshrcText)
+    }
+
+    private func normalizedProfileText(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func normalizedAuthJSON(_ text: String) -> String {
+        let trimmedText = normalizedProfileText(text)
+        guard let data = trimmedText.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data),
+              JSONSerialization.isValidJSONObject(object),
+              let stableData = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
+              let stableText = String(data: stableData, encoding: .utf8) else {
+            return trimmedText
+        }
+
+        return stableText
     }
 
     private func validate(profile: CodexProfile) -> String? {

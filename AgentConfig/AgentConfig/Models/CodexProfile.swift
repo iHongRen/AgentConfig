@@ -16,6 +16,9 @@ struct CodexProfile: Identifiable, Codable, Equatable {
     var appliedZshrcText: String
     var isActive: Bool
     var isDirty: Bool
+    var configEditorHeight: Double?
+    var authEditorHeight: Double?
+    var zshrcEditorHeight: Double?
 
     init(
         id: UUID = UUID(),
@@ -27,7 +30,10 @@ struct CodexProfile: Identifiable, Codable, Equatable {
         appliedAuthText: String = "",
         appliedZshrcText: String = "",
         isActive: Bool = false,
-        isDirty: Bool = false
+        isDirty: Bool = false,
+        configEditorHeight: Double? = nil,
+        authEditorHeight: Double? = nil,
+        zshrcEditorHeight: Double? = nil
     ) {
         self.id = id
         self.name = name
@@ -39,6 +45,9 @@ struct CodexProfile: Identifiable, Codable, Equatable {
         self.appliedZshrcText = appliedZshrcText
         self.isActive = isActive
         self.isDirty = isDirty
+        self.configEditorHeight = configEditorHeight
+        self.authEditorHeight = authEditorHeight
+        self.zshrcEditorHeight = zshrcEditorHeight
     }
 
     static var defaultProfiles: [CodexProfile] {
