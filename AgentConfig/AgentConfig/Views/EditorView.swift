@@ -264,7 +264,7 @@ struct CodeEditorView: NSViewRepresentable {
         scrollView.backgroundColor = editorBackgroundColor
 
         // 2. TextView — 先给一个非零 frame，之后会随 scrollView 自动调整
-        let tv = NSTextView(frame: NSRect(x: 0, y: 0, width: 100, height: 100))
+        let tv = CommentingTextView(frame: NSRect(x: 0, y: 0, width: 100, height: 100))
 
         // 3. 布局配置：垂直可伸缩，宽度跟随 scrollView
         tv.isVerticallyResizable = true
@@ -298,6 +298,7 @@ struct CodeEditorView: NSViewRepresentable {
         tv.isAutomaticSpellingCorrectionEnabled = false
         tv.isGrammarCheckingEnabled = false
         tv.isContinuousSpellCheckingEnabled = false
+        tv.commentFileType = fileType
 
         // 6. Delegate
         tv.delegate = context.coordinator
@@ -344,7 +345,7 @@ struct CodeEditorView: NSViewRepresentable {
     // MARK: updateNSView
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        guard let tv = scrollView.documentView as? NSTextView else { return }
+        guard let tv = scrollView.documentView as? CommentingTextView else { return }
 
         let textColor = isDarkMode ? NSColor(white: 0.92, alpha: 1) : NSColor(white: 0.10, alpha: 1)
         let typingAttrs: [NSAttributedString.Key: Any] = [
@@ -366,6 +367,7 @@ struct CodeEditorView: NSViewRepresentable {
             tv.textStorage?.delegate = context.coordinator.highlighter
         }
 
+        tv.commentFileType = fileType
         context.coordinator.highlighter?.fileType = fileType
         context.coordinator.highlighter?.isDarkMode = isDarkMode
 
@@ -723,4 +725,3 @@ private extension Color {
         Color(nsColor: .windowBackgroundColor)
     }
 }
-

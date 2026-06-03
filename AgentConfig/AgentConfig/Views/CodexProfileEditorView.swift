@@ -739,7 +739,7 @@ private struct HighlightedProfileCodeEditor: NSViewRepresentable {
         }
     }
 
-    final class ResizableProfileTextView: NSTextView {
+    final class ResizableProfileTextView: CommentingTextView {
         var currentHeight: CGFloat = ProfileEditorSizing.fallbackHeight
         var onResizeStart: (() -> Void)?
         var onResize: ((CGFloat) -> Void)?
@@ -771,10 +771,6 @@ private struct HighlightedProfileCodeEditor: NSViewRepresentable {
 
         required init?(coder: NSCoder) {
             fatalError("init(coder:) has not been implemented")
-        }
-
-        deinit {
-            NotificationCenter.default.removeObserver(self)
         }
 
         override func updateTrackingAreas() {
@@ -938,6 +934,7 @@ private struct HighlightedProfileCodeEditor: NSViewRepresentable {
         textView.isAutomaticSpellingCorrectionEnabled = false
         textView.isGrammarCheckingEnabled = false
         textView.isContinuousSpellCheckingEnabled = false
+        textView.commentFileType = fileType
         textView.delegate = context.coordinator
 
         scrollView.documentView = textView
@@ -969,6 +966,7 @@ private struct HighlightedProfileCodeEditor: NSViewRepresentable {
         textView.onResizeStart = onResizeStart
         textView.onResize = onResize
         textView.onResizeEnd = onResizeEnd
+        textView.commentFileType = fileType
 
         let isComposingMarkedText = textView.hasMarkedText() || context.coordinator.isComposingMarkedText
         let contentChanged = !isComposingMarkedText
