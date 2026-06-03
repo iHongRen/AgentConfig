@@ -413,19 +413,6 @@ struct CodeEditorView: NSViewRepresentable {
         tv.insertionPointColor = textColor
         scrollView.backgroundColor = editorBackgroundColor
 
-        // 搜索栏显隐时，补偿滚动位置，避免文本内容视觉跳动
-        let searchVisibilityChanged = context.coordinator.lastSearchBarVisible != isSearchBarVisible
-        let newTopInset: CGFloat = isSearchBarVisible ? 54 : 14
-        tv.textContainerInset = NSSize(width: 16, height: newTopInset)
-        if searchVisibilityChanged {
-            let delta: CGFloat = isSearchBarVisible ? 40 : -40
-            var origin = scrollView.contentView.bounds.origin
-            origin.y = max(0, origin.y + delta)
-            scrollView.contentView.setBoundsOrigin(origin)
-            scrollView.reflectScrolledClipView(scrollView.contentView)
-            context.coordinator.lastSearchBarVisible = isSearchBarVisible
-        }
-
         // 刷新行号
         if let ruler = scrollView.verticalRulerView as? LineNumberRulerView {
             ruler.refresh()
@@ -594,8 +581,13 @@ struct EditorView: View {
     }
 
     private var editorContent: some View {
-        ZStack(alignment: .top) {
+        ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
+                if isSearchBarVisible {
+                    SearchBarView(isVisible: $isSearchBarVisible, viewModel: editorViewModel)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
                 CodeEditorView(
                     text: $editorViewModel.content,
                     cursorLine: $cursorLine,
@@ -610,11 +602,6 @@ struct EditorView: View {
 
                 statusBar
             }
-
-            SearchBarView(isVisible: $isSearchBarVisible, viewModel: editorViewModel)
-                .offset(y: isSearchBarVisible ? 0 : -40)
-                .opacity(isSearchBarVisible ? 1 : 0)
-                .allowsHitTesting(isSearchBarVisible)
 
             if let msg = toastMessage {
                 toastView(message: msg)
