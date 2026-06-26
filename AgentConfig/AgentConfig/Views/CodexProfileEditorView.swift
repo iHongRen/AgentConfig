@@ -19,9 +19,6 @@ struct CodexProfileEditorView: View {
     @State private var resizingFields: Set<ProfileCodeField> = []
     @State private var pendingDeleteProfile: CodexProfile?
     @State private var editingProfileName: String = ""
-    @State private var isValidating = false
-    @State private var validationResult: APIValidationResult?
-    @State private var showValidationSheet = false
 
     private let profileNameMaxLength = 15
 
@@ -109,45 +106,6 @@ struct CodexProfileEditorView: View {
                 secondaryButton: .cancel(Text("取消"))
             )
         }
-        .sheet(isPresented: $showValidationSheet) {
-            VStack(spacing: 16) {
-                Image(systemName: validationResult?.isValid == true ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .font(.system(size: 48))
-                    .foregroundStyle(validationResult?.isValid == true ? .green : .red)
-
-                Text(validationResult?.isValid == true ? "配置有效" : "配置无效")
-                    .font(.title2)
-                    .fontWeight(.bold)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("验证地址:")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(validationResult?.baseURL ?? "")
-                        .font(.system(.body, design: .monospaced))
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(8)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-
-                Text(validationResult?.message ?? "")
-                    .foregroundStyle(.secondary)
-
-                if let statusCode = validationResult?.statusCode {
-                    Text("HTTP 状态码: \(statusCode)")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-
-                Button("确定") {
-                    showValidationSheet = false
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            .padding(24)
-            .frame(width: 360)
-        }
     }
 
     private func profileToolbar(profile: CodexProfile) -> some View {
@@ -219,37 +177,6 @@ struct CodexProfileEditorView: View {
 
             Button {
                 Task {
-                    isValidating = true
-                    validationResult = await viewModel.validateWithAPI(profile: profile)
-                    isValidating = false
-                    showValidationSheet = true
-                }
-            } label: {
-                Group {
-                    if isValidating {
-                        ProgressView()
-                            .controlSize(.small)
-                            .frame(width: 44, height: 34)
-                    } else {
-                        Label("验证", systemImage: "checkmark.shield")
-                            .labelStyle(.titleAndIcon)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 68, height: 34)
-                    }
-                }
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(red: 0.30, green: 0.68, blue: 0.31))
-                )
-                .contentShape(RoundedRectangle(cornerRadius: 10))
-            }
-            .buttonStyle(.plain)
-            .disabled(isValidating)
-            .help("验证配置是否有效")
-
-            Button {
-                Task {
                     let success = await viewModel.applySelected()
                     showToast(success ? "已应用配置" : (viewModel.lastErrorMessage ?? "应用失败"))
                 }
@@ -266,8 +193,6 @@ struct CodexProfileEditorView: View {
                     .contentShape(RoundedRectangle(cornerRadius: 10))
             }
             .buttonStyle(.plain)
-            .disabled(viewModel.validateSelected() != nil)
-            .opacity(viewModel.validateSelected() != nil ? 0.55 : 1)
             .help("应用当前配置")
         }
         .padding(.horizontal, 12)

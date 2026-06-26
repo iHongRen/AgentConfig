@@ -38,7 +38,7 @@ Views (SwiftUI + AppKit via NSViewRepresentable)
 - **AgentConfigApp.swift** — `@main` entry point, `AppDelegate`, `CommandCoordinator`, `MainContentView`. The app is a single `NavigationSplitView` with sidebar and detail panes. It owns `AppViewModel`, `EditorViewModel`, `CodexProfileViewModel`, and menu command coordination.
 - **AppViewModel** — central coordinator: owns AgentScanner, FileService, AppSettings. Handles file selection, custom paths, hide/show files.
 - **EditorViewModel** — file editing (load/save/undo/redo/search/JSON format), external change detection, source runner for shell files. Content is a `@Published` two-way binding to the NSTextView.
-- **CodexProfileViewModel** — manages Codex profile selection, editing, persistence, validation, and applying profiles to disk.
+- **CodexProfileViewModel** — manages Codex profile selection, editing, persistence, and applying profiles to disk.
 - **CodexProfileService** — stores profiles in Application Support and applies the selected profile to `~/.codex/config.toml`, `~/.codex/auth.json`, and a managed block in `~/.zshrc`.
 - **SidebarView** — shows environment files, known agent files, custom-added files, missing files, and a Codex Profiles subsection under the Codex agent.
 - **EditorView / CodeEditorView** — `NSTextView` wrapped via `NSViewRepresentable`. Syntax highlighting via `SyntaxHighlighter` (`NSTextStorageDelegate`, regex-based).
