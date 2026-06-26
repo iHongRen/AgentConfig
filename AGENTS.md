@@ -45,7 +45,7 @@ Views (SwiftUI + AppKit via NSViewRepresentable)
 - **CodexProfileEditorView** — detail pane for editing profile name, config TOML, auth JSON, zshrc exports, previewing affected files, and applying the profile.
 - **AgentScanner** — scans `~` for known agent config files using definitions from `AgentDefinitions` (currently 5 default agents: Claude Code, Codex, Gemini CLI, OpenCode CLI, Qwen Code).
 - **FileWatcher** — `DispatchSourceFileSystemObject` with 500ms debounce for external change detection.
-- **AppSettings** — `UserDefaults` wrapper for appearance, language, autoSource, customPaths, hiddenFiles, and per-category added file paths.
+- **AppSettings** — `UserDefaults` wrapper for appearance, language, customPaths, hiddenFiles, and per-category added file paths.
 - **i18n** — `NSLocalizedString` with en and zh-Hans. Language switching via `UserDefaults.standard.set(..., forKey: "AppleLanguages")`.
 
 ### Service protocols
@@ -56,7 +56,6 @@ Each service is defined as a protocol + implementation:
 |----------|---------------|------|
 | `AgentScannerProtocol` | `AgentScanner` | Discover config files on disk |
 | `FileServiceProtocol` | `FileService` | Read/write/create/delete files |
-| `SourceRunnerProtocol` | `SourceRunner` | Run `source` on shell files |
 | `FileWatcherProtocol` | `FileWatcher` | Watch open files for external changes |
 | `CodexProfileServiceProtocol` | `CodexProfileService` | Persist and apply Codex profiles |
 
@@ -64,7 +63,7 @@ Each service is defined as a protocol + implementation:
 
 1. App launch → `AppViewModel.refresh()` → `AgentScanner.scan()` → categories + files in sidebar
 2. User clicks file → `AppViewModel.selectedFile` changes → `EditorView` loads via `EditorViewModel.load(file:)`
-3. Cmd+S → `EditorViewModel.save()` → `FileService.write()` → optional `SourceRunner.source()` for shell files
+3. Cmd+S → `EditorViewModel.save()` → `FileService.write()`
 4. User selects a Codex profile → `CodexProfileViewModel.selectedProfile` changes → detail pane switches to `CodexProfileEditorView`
 5. User applies profile → `CodexProfileViewModel.applySelected()` → `CodexProfileService.apply(profile:)` writes Codex config/auth files and updates the managed `.zshrc` block
 

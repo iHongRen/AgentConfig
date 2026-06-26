@@ -86,9 +86,6 @@ struct AgentConfigApp: App {
             .onChange(of: appViewModel.settings.appearanceMode) { _, newMode in
                 applyAppearance(newMode)
             }
-            .onChange(of: appViewModel.settings.autoSource) { _, newValue in
-                editorViewModel.autoSource = newValue
-            }
         }
         .defaultSize(width: 800, height: 640)
         .commands {
@@ -221,9 +218,7 @@ struct MainContentView: View {
         .onChange(of: codexProfileViewModel.didFinishInitialLoad) { _, _ in
             resolveInitialPageIfNeeded()
         }
-        // 同步 autoSource 设置
         .onAppear {
-            editorViewModel.autoSource = appViewModel.settings.autoSource
             resolveInitialPageIfNeeded()
         }
     }

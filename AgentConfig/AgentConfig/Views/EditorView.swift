@@ -515,8 +515,6 @@ struct EditorView: View {
     @State private var isSearchBarVisible = false
     @State private var cursorLine = 1
     @State private var cursorColumn = 1
-    @State private var toastMessage: String? = nil
-    @State private var toastTask: Task<Void, Never>? = nil
 
     var body: some View {
         Group {
@@ -557,11 +555,6 @@ struct EditorView: View {
         } message: {
             Text("当前文件在外部被修改，请选择如何处理本地未保存的修改。")
         }
-        .onChange(of: editorViewModel.sourceResult) { _, result in
-            guard let result else { return }
-            let msg = result.success ? "source 执行成功" : "source 失败：\(result.errorOutput)"
-            showToast(msg)
-        }
         .onChange(of: editorViewModel.currentFile) { _, newFile in
             cursorLine = 1
             cursorColumn = 1
@@ -581,33 +574,25 @@ struct EditorView: View {
     }
 
     private var editorContent: some View {
-        ZStack(alignment: .bottom) {
-            VStack(spacing: 0) {
-                if isSearchBarVisible {
-                    SearchBarView(isVisible: $isSearchBarVisible, viewModel: editorViewModel)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
-
-                CodeEditorView(
-                    text: $editorViewModel.content,
-                    cursorLine: $cursorLine,
-                    cursorColumn: $cursorColumn,
-                    fileType: editorViewModel.currentFile?.fileType ?? .plainText,
-                    isDarkMode: colorScheme == .dark,
-                    searchResults: editorViewModel.searchResults,
-                    currentSearchIndex: editorViewModel.currentSearchIndex,
-                    scrollRevision: editorViewModel.scrollRevision,
-                    isSearchBarVisible: isSearchBarVisible
-                )
-
-                statusBar
+        VStack(spacing: 0) {
+            if isSearchBarVisible {
+                SearchBarView(isVisible: $isSearchBarVisible, viewModel: editorViewModel)
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            if let msg = toastMessage {
-                toastView(message: msg)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .padding(.bottom, 44)
-            }
+            CodeEditorView(
+                text: $editorViewModel.content,
+                cursorLine: $cursorLine,
+                cursorColumn: $cursorColumn,
+                fileType: editorViewModel.currentFile?.fileType ?? .plainText,
+                isDarkMode: colorScheme == .dark,
+                searchResults: editorViewModel.searchResults,
+                currentSearchIndex: editorViewModel.currentSearchIndex,
+                scrollRevision: editorViewModel.scrollRevision,
+                isSearchBarVisible: isSearchBarVisible
+            )
+
+            statusBar
         }
     }
 
@@ -678,27 +663,6 @@ struct EditorView: View {
             return "Shell Script"
         case .plainText:
             return "Plain Text"
-        }
-    }
-
-    private func toastView(message: String) -> some View {
-        Text(message)
-            .font(.system(size: 13))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-        .background(Capsule().fill(Color(nsColor: .labelColor).opacity(0.78)))
-    }
-
-    private func showToast(_ message: String) {
-        toastTask?.cancel()
-        withAnimation(.easeInOut(duration: 0.2)) { toastMessage = message }
-        toastTask = Task {
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.3)) { toastMessage = nil }
-            }
         }
     }
 }

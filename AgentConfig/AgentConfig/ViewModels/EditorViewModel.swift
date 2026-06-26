@@ -12,7 +12,7 @@ import Combine
 
 /// 编辑器 ViewModel，负责文件内容的加载、编辑、保存、搜索和格式化
 ///
-/// - 注入 `FileServiceProtocol`、`SourceRunnerProtocol` 依赖
+/// - 注入 `FileServiceProtocol` 依赖
 /// - 通过 `@Published` 属性驱动 SwiftUI 视图更新
 /// - 支持撤销/重做（≥100步）、搜索导航、JSON 格式化
 @MainActor
@@ -47,9 +47,6 @@ final class EditorViewModel: ObservableObject {
     /// 搜索是否区分大小写
     @Published var isCaseSensitive: Bool = false
 
-    /// source 命令执行结果（用于 UI 展示）
-    @Published var sourceResult: SourceResult?
-
     /// 最近一次错误（用于 UI 展示）
     @Published var lastError: AppError?
 
@@ -61,16 +58,12 @@ final class EditorViewModel: ObservableObject {
     /// 当前打开的文件
     private(set) var currentFile: ConfigFile?
 
-    /// 是否自动 source 环境变量文件（由外部注入）
-    var autoSource: Bool = true
-
     /// 最后一次加载文件的时间，用于 onForeground() 比较
     private(set) var lastLoadedDate: Date?
 
     // MARK: - Dependencies
 
     private let fileService: FileServiceProtocol
-    private let sourceRunner: SourceRunnerProtocol
     private let fileWatcher: FileWatcherProtocol
 
     // MARK: - Undo/Redo
@@ -92,15 +85,12 @@ final class EditorViewModel: ObservableObject {
     /// 初始化 EditorViewModel
     /// - Parameters:
     ///   - fileService: 文件读写服务，默认使用 `FileService()`
-    ///   - sourceRunner: source 执行服务，默认使用 `SourceRunner()`
     ///   - fileWatcher: 文件监控服务，默认使用 `FileWatcher()`
     init(
         fileService: FileServiceProtocol? = nil,
-        sourceRunner: SourceRunnerProtocol? = nil,
         fileWatcher: FileWatcherProtocol? = nil
     ) {
         self.fileService = fileService ?? FileService()
-        self.sourceRunner = sourceRunner ?? SourceRunner()
         self.fileWatcher = fileWatcher ?? FileWatcher()
     }
 
@@ -158,7 +148,6 @@ final class EditorViewModel: ObservableObject {
     ///
     /// 写入成功后：
     /// - 将 `isModified` 设为 `false`
-    /// - 若文件为环境变量类型（`.shell`）且 `autoSource` 开启，则执行 source
     /// - Throws: `AppError.fileWriteFailed` 写入失败时
     func save() async throws {
         guard let file = currentFile else { return }
@@ -168,15 +157,6 @@ final class EditorViewModel: ObservableObject {
             try await fileService.write(content: content, to: file.url)
             // 写入成功后标记为未修改
             isModified = false
-
-            // 仅对环境变量文件且 autoSource 开启时执行 source
-            if file.fileType == .shell && autoSource {
-                let result = await sourceRunner.source(file: file.url)
-                sourceResult = result
-                if !result.success {
-                    lastError = AppError.sourceFailed(stderr: result.errorOutput)
-                }
-            }
         } catch let appError as AppError {
             lastError = appError
             throw appError

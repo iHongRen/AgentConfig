@@ -92,9 +92,6 @@ enum AppLanguage: String, Codable, CaseIterable {
 
 /// 应用全局设置，持久化到 UserDefaults
 struct AppSettings: Codable {
-    /// 保存环境变量文件后是否自动执行 source
-    var autoSource: Bool = true
-
     /// 外观模式
     var appearanceMode: AppearanceMode = .system
 
@@ -114,7 +111,6 @@ struct AppSettings: Codable {
     var lastVisitedPage: LastVisitedPage?
 
     enum CodingKeys: String, CodingKey {
-        case autoSource
         case appearanceMode
         case language
         case customPaths
@@ -127,7 +123,6 @@ struct AppSettings: Codable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        autoSource = try container.decodeIfPresent(Bool.self, forKey: .autoSource) ?? true
         appearanceMode = try container.decodeIfPresent(AppearanceMode.self, forKey: .appearanceMode) ?? .system
         language = try container.decodeIfPresent(AppLanguage.self, forKey: .language) ?? .system
         customPaths = try container.decodeIfPresent([URL].self, forKey: .customPaths) ?? []

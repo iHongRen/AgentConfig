@@ -58,7 +58,7 @@ struct CodexProfile: Identifiable, Codable, Equatable {
 
         [model_providers.OpenAI]
         name = "OpenAI"
-        base_url = "https://x2app.top"
+        base_url = "https://xxx.com"
         wire_api = "responses"
         requires_openai_auth = true
         """
@@ -70,13 +70,11 @@ struct CodexProfile: Identifiable, Codable, Equatable {
         """
 
         let zshrc = """
-        export OPENAI_BASE_URL="https://x2app.top"
-        export CODEX_PROFILE="personal"
         """
 
         return [
             CodexProfile(
-                name: "个人配置",
+                name: "新配置",
                 configText: config,
                 authText: auth,
                 zshrcText: zshrc,

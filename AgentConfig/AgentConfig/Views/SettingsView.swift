@@ -12,7 +12,6 @@ import SwiftUI
 /// 提供以下设置项：
 /// - 外观模式：浅色 / 深色 / 跟随系统
 /// - 界面语言：English / 简体中文 / 跟随系统
-/// - 自动 source：保存环境变量文件后是否自动执行 source
 ///
 /// 每次设置变更后立即调用 `AppViewModel.updateSettings(_:)` 持久化。
 struct SettingsView: View {
@@ -22,7 +21,6 @@ struct SettingsView: View {
     // 本地副本，用于绑定 Picker / Toggle，变更时同步到 ViewModel
     @State private var appearanceMode: AppearanceMode = .system
     @State private var language: AppLanguage = .system
-    @State private var autoSource: Bool = true
 
     var body: some View {
         Form {
@@ -56,26 +54,6 @@ struct SettingsView: View {
                 }
             }
 
-            // MARK: - 自动 source
-            Section {
-                Toggle(
-                    NSLocalizedString("settings.autoSource", value: "Auto Source on Save", comment: "Auto source toggle label"),
-                    isOn: $autoSource
-                )
-                .onChange(of: autoSource) { _, newValue in
-                    saveSettings(autoSource: newValue)
-                }
-            } footer: {
-                Text(
-                    NSLocalizedString(
-                        "settings.autoSource.description",
-                        value: "Automatically run `source` after saving environment variable files.",
-                        comment: "Auto source description"
-                    )
-                )
-                .foregroundStyle(.secondary)
-                .font(.caption)
-            }
         }
         .formStyle(.grouped)
         .frame(width: 400)
@@ -84,7 +62,6 @@ struct SettingsView: View {
             // 从 ViewModel 加载当前设置到本地状态
             appearanceMode = appViewModel.settings.appearanceMode
             language = appViewModel.settings.language
-            autoSource = appViewModel.settings.autoSource
         }
         .navigationTitle(
             NSLocalizedString("settings.title", value: "Settings", comment: "Settings window title")
@@ -96,14 +73,11 @@ struct SettingsView: View {
     /// 将当前本地状态（含可选覆盖值）构建为新的 AppSettings 并保存
     private func saveSettings(
         appearanceMode: AppearanceMode? = nil,
-        language: AppLanguage? = nil,
-        autoSource: Bool? = nil
+        language: AppLanguage? = nil
     ) {
         var updated = appViewModel.settings
         updated.appearanceMode = appearanceMode ?? self.appearanceMode
         updated.language = language ?? self.language
-        updated.autoSource = autoSource ?? self.autoSource
         appViewModel.updateSettings(updated)
     }
 }
-
