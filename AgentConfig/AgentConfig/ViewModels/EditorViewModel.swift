@@ -148,6 +148,7 @@ final class EditorViewModel: ObservableObject {
     ///
     /// 写入成功后：
     /// - 将 `isModified` 设为 `false`
+    /// - 更新 `lastLoadedDate`，避免将本次保存误判为外部修改
     /// - Throws: `AppError.fileWriteFailed` 写入失败时
     func save() async throws {
         guard let file = currentFile else { return }
@@ -157,6 +158,8 @@ final class EditorViewModel: ObservableObject {
             try await fileService.write(content: content, to: file.url)
             // 写入成功后标记为未修改
             isModified = false
+            hasExternalConflict = false
+            lastLoadedDate = fileService.modificationDate(of: file.url) ?? Date()
         } catch let appError as AppError {
             lastError = appError
             throw appError
@@ -216,13 +219,17 @@ final class EditorViewModel: ObservableObject {
 
     /// 解决外部文件冲突
     ///
-    /// - Parameter keepLocal: `true` 保留本地修改，清除冲突标记；`false` 加载外部版本，清除冲突标记
+    /// - Parameter keepLocal: `true` 将 App 中的修改写回文件；`false` 加载外部版本覆盖编辑区
     func resolveConflict(keepLocal: Bool) async {
-        hasExternalConflict = false
         if keepLocal {
-            // 保留本地修改，仅更新 lastLoadedDate 以避免重复触发
-            lastLoadedDate = currentFile.flatMap { fileService.modificationDate(of: $0.url) } ?? Date()
+            do {
+                try await save()
+            } catch {
+                // 保存失败时保留冲突状态，允许用户在修复问题后重新决策
+                hasExternalConflict = true
+            }
         } else {
+            hasExternalConflict = false
             // 加载外部版本
             if let file = currentFile {
                 await silentRefresh(file: file)

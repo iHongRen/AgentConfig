@@ -543,17 +543,17 @@ struct EditorView: View {
             }
         }
         .alert(
-            "文件已被外部修改",
+            "检测到外部修改",
             isPresented: $editorViewModel.hasExternalConflict
         ) {
-            Button("保留本地修改") {
+            Button("保存 App 中的修改") {
                 Task { await editorViewModel.resolveConflict(keepLocal: true) }
             }
-            Button("加载外部版本", role: .destructive) {
+            Button("使用外部版本", role: .destructive) {
                 Task { await editorViewModel.resolveConflict(keepLocal: false) }
             }
         } message: {
-            Text("当前文件在外部被修改，请选择如何处理本地未保存的修改。")
+            Text("当前文件已在外部更新。请选择将 App 中未保存的修改写回文件，或使用外部版本覆盖当前编辑区。")
         }
         .onChange(of: editorViewModel.currentFile) { _, newFile in
             cursorLine = 1
