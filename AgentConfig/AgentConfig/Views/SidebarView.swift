@@ -13,6 +13,7 @@ struct SidebarView: View {
 
     @EnvironmentObject var appViewModel: AppViewModel
     @ObservedObject var codexProfileViewModel: CodexProfileViewModel
+    @ObservedObject var claudeProfileViewModel: ClaudeProfileViewModel
 
     @State private var isEnvExpanded = true
     @State private var expandedAgentIDs: Set<String> = []
@@ -22,11 +23,13 @@ struct SidebarView: View {
     enum DeleteTarget: Identifiable {
         case hideFile(URL)
         case deleteCodexProfile(CodexProfile)
+        case deleteClaudeProfile(ClaudeProfile)
 
         var id: String {
             switch self {
             case .hideFile(let url): return "hide-\(url.absoluteString)"
             case .deleteCodexProfile(let profile): return "profile-\(profile.id.uuidString)"
+            case .deleteClaudeProfile(let profile): return "claude-profile-\(profile.id.uuidString)"
             }
         }
     }
@@ -71,6 +74,15 @@ struct SidebarView: View {
                     },
                     secondaryButton: .cancel(Text("取消"))
                 )
+            case .deleteClaudeProfile(let profile):
+                return Alert(
+                    title: Text("删除 Claude Profile？"),
+                    message: Text("将删除“\(profile.name.isEmpty ? "未命名配置" : profile.name)”。此操作不会修改已经写入磁盘的 Claude 配置文件。"),
+                    primaryButton: .destructive(Text("删除")) {
+                        _ = claudeProfileViewModel.deleteProfile(id: profile.id)
+                    },
+                    secondaryButton: .cancel(Text("取消"))
+                )
             }
         }
     }
@@ -111,6 +123,11 @@ struct SidebarView: View {
                 iconColor: category.iconColor,
                 isExpanded: bindingForAgent(category.id)
             ) {
+                if category.id == "claude" {
+                    claudeProfileSection
+                    sidebarSubheading("Files")
+                }
+
                 if category.id == "codex" {
                     codexProfileSection
                     sidebarSubheading("Files")
@@ -176,6 +193,37 @@ struct SidebarView: View {
         }
     }
 
+    private var claudeProfileSection: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            HStack {
+                sidebarSubheading("Profiles")
+
+                Spacer()
+
+                CountBadge(count: claudeProfileViewModel.profiles.count)
+
+                Button {
+                    claudeProfileViewModel.addProfile()
+                    codexProfileViewModel.clearSelection()
+                    if appViewModel.selectedFile != nil {
+                        appViewModel.selectFile(nil)
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .bold))
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .help("新增 Claude Profile")
+                .padding(.trailing, 4)
+            }
+
+            ForEach(claudeProfileViewModel.profiles) { profile in
+                claudeProfileRow(profile)
+            }
+        }
+    }
+
     private func sidebarSubheading(_ title: String) -> some View {
         Text(title)
             .font(.system(size: 10, weight: .bold))
@@ -188,10 +236,13 @@ struct SidebarView: View {
 
     private func codexProfileRow(_ profile: CodexProfile) -> some View {
         Button {
-            guard codexProfileViewModel.selectedProfileID != profile.id || appViewModel.selectedFile != nil else { return }
+            guard codexProfileViewModel.selectedProfileID != profile.id
+                    || appViewModel.selectedFile != nil
+                    || claudeProfileViewModel.selectedProfileID != nil else { return }
             if appViewModel.selectedFile != nil {
                 appViewModel.selectFile(nil)
             }
+            claudeProfileViewModel.clearSelection()
             codexProfileViewModel.selectProfile(profile)
         } label: {
             HStack(spacing: 10) {
@@ -237,10 +288,67 @@ struct SidebarView: View {
         }
     }
 
+    private func claudeProfileRow(_ profile: ClaudeProfile) -> some View {
+        Button {
+            guard claudeProfileViewModel.selectedProfileID != profile.id
+                    || appViewModel.selectedFile != nil
+                    || codexProfileViewModel.selectedProfileID != nil else { return }
+            if appViewModel.selectedFile != nil {
+                appViewModel.selectFile(nil)
+            }
+            codexProfileViewModel.clearSelection()
+            claudeProfileViewModel.selectProfile(profile)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "rectangle.stack")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    .frame(width: 18)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(profile.name.isEmpty ? "未命名配置" : profile.name)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Text(claudeProfileStatusText(profile))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 4)
+
+                Circle()
+                    .fill(claudeProfileStateColor(profile))
+                    .frame(width: 8, height: 8)
+            }
+            .padding(.leading, 34)
+            .padding(.trailing, 10)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(RoundedRectangle(cornerRadius: 7))
+            .background(
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(claudeProfileViewModel.selectedProfileID == profile.id ? Color.accentColor.opacity(0.16) : Color.clear)
+            )
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button("删除 Profile") {
+                deleteTarget = .deleteClaudeProfile(profile)
+            }
+            .disabled(claudeProfileViewModel.profiles.count <= 1)
+        }
+    }
+
     private func fileRow(_ file: ConfigFile) -> some View {
         Button {
-            guard appViewModel.selectedFile?.url != file.url || codexProfileViewModel.selectedProfileID != nil else { return }
+            guard appViewModel.selectedFile?.url != file.url
+                    || codexProfileViewModel.selectedProfileID != nil
+                    || claudeProfileViewModel.selectedProfileID != nil else { return }
             codexProfileViewModel.clearSelection()
+            claudeProfileViewModel.clearSelection()
             appViewModel.selectFile(file)
         } label: {
             HStack(spacing: 10) {
@@ -321,6 +429,18 @@ struct SidebarView: View {
     }
 
     private func profileStateColor(_ profile: CodexProfile) -> Color {
+        if profile.isDirty { return .orange }
+        if profile.isActive { return .green }
+        return Color(nsColor: .tertiaryLabelColor)
+    }
+
+    private func claudeProfileStatusText(_ profile: ClaudeProfile) -> String {
+        if profile.isDirty { return "未应用" }
+        if profile.isActive { return "已应用" }
+        return "草稿"
+    }
+
+    private func claudeProfileStateColor(_ profile: ClaudeProfile) -> Color {
         if profile.isDirty { return .orange }
         if profile.isActive { return .green }
         return Color(nsColor: .tertiaryLabelColor)

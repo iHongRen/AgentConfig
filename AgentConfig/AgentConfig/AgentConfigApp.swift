@@ -53,6 +53,7 @@ struct AgentConfigApp: App {
     @StateObject private var appViewModel = AppViewModel()
     @StateObject private var editorViewModel = EditorViewModel()
     @StateObject private var codexProfileViewModel = CodexProfileViewModel()
+    @StateObject private var claudeProfileViewModel = ClaudeProfileViewModel()
     @StateObject private var saveCoordinator = CommandCoordinator()
 
     // MARK: - Appearance
@@ -72,6 +73,7 @@ struct AgentConfigApp: App {
                 appViewModel: appViewModel,
                 editorViewModel: editorViewModel,
                 codexProfileViewModel: codexProfileViewModel,
+                claudeProfileViewModel: claudeProfileViewModel,
                 saveCoordinator: saveCoordinator
             )
             .id(languageChangeID)  // 语言切换时强制重建整个视图树
@@ -169,6 +171,7 @@ struct MainContentView: View {
     @ObservedObject var appViewModel: AppViewModel
     @ObservedObject var editorViewModel: EditorViewModel
     @ObservedObject var codexProfileViewModel: CodexProfileViewModel
+    @ObservedObject var claudeProfileViewModel: ClaudeProfileViewModel
     @ObservedObject var saveCoordinator: CommandCoordinator
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var windowWidth: CGFloat = .zero
@@ -176,11 +179,16 @@ struct MainContentView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(codexProfileViewModel: codexProfileViewModel)
+            SidebarView(
+                codexProfileViewModel: codexProfileViewModel,
+                claudeProfileViewModel: claudeProfileViewModel
+            )
                 .environmentObject(appViewModel)
         } detail: {
             if codexProfileViewModel.selectedProfile != nil {
                 CodexProfileEditorView(viewModel: codexProfileViewModel)
+            } else if claudeProfileViewModel.selectedProfile != nil {
+                ClaudeProfileEditorView(viewModel: claudeProfileViewModel)
             } else {
                 EditorView(
                     editorViewModel: editorViewModel,
@@ -203,6 +211,7 @@ struct MainContentView: View {
         .onChange(of: appViewModel.selectedFile) { _, newFile in
             guard let file = newFile else { return }
             codexProfileViewModel.clearSelection()
+            claudeProfileViewModel.clearSelection()
             Task {
                 try? await editorViewModel.load(file: file)
             }
@@ -212,10 +221,18 @@ struct MainContentView: View {
             guard let newProfileID else { return }
             appViewModel.persistLastVisitedPage(.codexProfile(id: newProfileID))
         }
+        .onChange(of: claudeProfileViewModel.selectedProfileID) { _, newProfileID in
+            guard hasResolvedInitialPage else { return }
+            guard let newProfileID else { return }
+            appViewModel.persistLastVisitedPage(.claudeProfile(id: newProfileID))
+        }
         .onChange(of: appViewModel.didFinishInitialRefresh) { _, _ in
             resolveInitialPageIfNeeded()
         }
         .onChange(of: codexProfileViewModel.didFinishInitialLoad) { _, _ in
+            resolveInitialPageIfNeeded()
+        }
+        .onChange(of: claudeProfileViewModel.didFinishInitialLoad) { _, _ in
             resolveInitialPageIfNeeded()
         }
         .onAppear {
@@ -239,12 +256,20 @@ struct MainContentView: View {
 
     private func resolveInitialPageIfNeeded() {
         guard !hasResolvedInitialPage else { return }
-        guard appViewModel.didFinishInitialRefresh, codexProfileViewModel.didFinishInitialLoad else { return }
+        guard appViewModel.didFinishInitialRefresh,
+              codexProfileViewModel.didFinishInitialLoad,
+              claudeProfileViewModel.didFinishInitialLoad else { return }
 
         hasResolvedInitialPage = true
 
         if codexProfileViewModel.restoreInitialSelectionIfNeeded(appViewModel: appViewModel) {
             appViewModel.selectFile(nil)
+            return
+        }
+
+        if claudeProfileViewModel.restoreInitialSelectionIfNeeded(appViewModel: appViewModel) {
+            appViewModel.selectFile(nil)
+            codexProfileViewModel.clearSelection()
             return
         }
 
@@ -254,6 +279,8 @@ struct MainContentView: View {
 
         if let defaultProfileID = codexProfileViewModel.defaultSelectedProfileID() {
             appViewModel.persistLastVisitedPage(.codexProfile(id: defaultProfileID))
+        } else if let defaultProfileID = claudeProfileViewModel.defaultSelectedProfileID() {
+            appViewModel.persistLastVisitedPage(.claudeProfile(id: defaultProfileID))
         }
     }
 }

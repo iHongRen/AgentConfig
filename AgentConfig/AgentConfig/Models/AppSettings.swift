@@ -10,6 +10,7 @@ import Foundation
 enum LastVisitedPage: Codable, Equatable {
     case configFile(path: String)
     case codexProfile(id: UUID)
+    case claudeProfile(id: UUID)
 
     private enum CodingKeys: String, CodingKey {
         case kind
@@ -20,6 +21,7 @@ enum LastVisitedPage: Codable, Equatable {
     private enum Kind: String, Codable {
         case configFile
         case codexProfile
+        case claudeProfile
     }
 
     init(from decoder: Decoder) throws {
@@ -32,6 +34,9 @@ enum LastVisitedPage: Codable, Equatable {
         case .codexProfile:
             let id = try container.decode(UUID.self, forKey: .profileID)
             self = .codexProfile(id: id)
+        case .claudeProfile:
+            let id = try container.decode(UUID.self, forKey: .profileID)
+            self = .claudeProfile(id: id)
         }
     }
 
@@ -43,6 +48,9 @@ enum LastVisitedPage: Codable, Equatable {
             try container.encode(path, forKey: .path)
         case .codexProfile(let id):
             try container.encode(Kind.codexProfile, forKey: .kind)
+            try container.encode(id, forKey: .profileID)
+        case .claudeProfile(let id):
+            try container.encode(Kind.claudeProfile, forKey: .kind)
             try container.encode(id, forKey: .profileID)
         }
     }
