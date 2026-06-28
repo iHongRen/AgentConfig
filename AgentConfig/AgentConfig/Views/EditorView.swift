@@ -515,6 +515,7 @@ struct EditorView: View {
     @State private var isSearchBarVisible = false
     @State private var cursorLine = 1
     @State private var cursorColumn = 1
+    @State private var saveErrorMessage: String?
 
     var body: some View {
         Group {
@@ -534,7 +535,13 @@ struct EditorView: View {
         .onAppear {
             saveCoordinator.onSave = { [weak editorViewModel = editorViewModel] in
                 guard let vm = editorViewModel else { return }
-                try? await vm.save()
+                do {
+                    try await vm.save()
+                } catch {
+                    await MainActor.run {
+                        saveErrorMessage = error.localizedDescription
+                    }
+                }
             }
             saveCoordinator.onToggleSearch = { [self] in
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
@@ -555,10 +562,18 @@ struct EditorView: View {
         } message: {
             Text("当前文件已在外部更新。请选择将 App 中未保存的修改写回文件，或使用外部版本覆盖当前编辑区。")
         }
+        .alert("保存失败", isPresented: saveErrorBinding) {
+            Button("确定", role: .destructive) {
+                saveErrorMessage = nil
+            }
+        } message: {
+            Text(saveErrorMessage ?? "保存时发生未知错误。")
+        }
         .onChange(of: editorViewModel.currentFile) { _, newFile in
             cursorLine = 1
             cursorColumn = 1
             isSearchBarVisible = false
+            saveErrorMessage = nil
         }
     }
 
@@ -621,16 +636,6 @@ struct EditorView: View {
             statusText("UTF-8")
             statusText(fileTypeLabel)
             statusText("LF")
-
-            HStack(spacing: 6) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(Color.green)
-                    .font(.system(size: 13))
-                Text("无语法错误")
-            }
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 14)
         }
         .frame(height: 31)
         .background(Color.editorChromeBackground)
@@ -646,24 +651,18 @@ struct EditorView: View {
     }
 
     private var fileTypeLabel: String {
-        switch editorViewModel.currentFile?.fileType ?? .plainText {
-        case .json:
-            return "JSON"
-        case .jsonc:
-            return "JSONC"
-        case .json5:
-            return "JSON5"
-        case .jsonl:
-            return "JSONL"
-        case .yaml:
-            return "YAML"
-        case .toml:
-            return "TOML"
-        case .shell:
-            return "Shell Script"
-        case .plainText:
-            return "Plain Text"
-        }
+        (editorViewModel.currentFile?.fileType ?? .plainText).displayName
+    }
+
+    private var saveErrorBinding: Binding<Bool> {
+        Binding(
+            get: { saveErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    saveErrorMessage = nil
+                }
+            }
+        )
     }
 }
 

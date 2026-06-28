@@ -174,13 +174,7 @@ struct EditorToolbarView: View {
 
     /// 当前文件是否为 JSON 系列类型
     private var isJSONFile: Bool {
-        guard let file = editorViewModel.currentFile else { return false }
-        switch file.fileType {
-        case .json, .jsonc, .json5, .jsonl:
-            return true
-        default:
-            return false
-        }
+        editorViewModel.currentFile?.fileType.supportsStrictJSONFormatting ?? false
     }
 
     // MARK: - Actions

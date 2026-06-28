@@ -31,6 +31,43 @@ enum FileType: Equatable {
         }
     }
 
+    /// 用于 UI 展示的文件类型名称
+    var displayName: String {
+        switch self {
+        case .json:
+            return "JSON"
+        case .jsonc:
+            return "JSONC"
+        case .json5:
+            return "JSON5"
+        case .jsonl:
+            return "JSONL"
+        case .yaml:
+            return "YAML"
+        case .toml:
+            return "TOML"
+        case .shell:
+            return "Shell Script"
+        case .plainText:
+            return "Plain Text"
+        }
+    }
+
+    /// 当前是否支持内建语法检查
+    var supportsSyntaxValidation: Bool {
+        switch self {
+        case .json, .jsonl:
+            return true
+        case .jsonc, .json5, .yaml, .toml, .shell, .plainText:
+            return false
+        }
+    }
+
+    /// 当前是否支持严格 JSON 格式化
+    var supportsStrictJSONFormatting: Bool {
+        self == .json
+    }
+
     /// 根据 URL 判断文件类型
     /// 优先检查扩展名，无扩展名时检查文件名
     static func detect(from url: URL) -> FileType {

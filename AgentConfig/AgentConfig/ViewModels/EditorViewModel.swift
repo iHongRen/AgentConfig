@@ -154,6 +154,7 @@ final class EditorViewModel: ObservableObject {
         guard let file = currentFile else { return }
 
         do {
+            try validateSyntaxBeforeSaving()
             // 先写入文件
             try await fileService.write(content: content, to: file.url)
             // 写入成功后标记为未修改
@@ -357,6 +358,47 @@ final class EditorViewModel: ObservableObject {
 
     // MARK: - Private Helpers
 
+    private func validateSyntaxBeforeSaving() throws {
+        guard let fileType = currentFile?.fileType else { return }
+
+        switch fileType {
+        case .json:
+            try validateStrictJSON(content)
+        case .jsonl:
+            try validateJSONLines(content)
+        case .jsonc, .json5, .yaml, .toml, .shell, .plainText:
+            return
+        }
+    }
+
+    private func validateStrictJSON(_ content: String) throws {
+        do {
+            _ = try JSONSerialization.jsonObject(with: Data(content.utf8), options: [.fragmentsAllowed])
+        } catch let jsonError as NSError {
+            let (line, column, message) = extractJSONErrorInfo(from: jsonError, originalContent: content)
+            throw AppError.jsonFormatError(line: line, column: column, message: message)
+        }
+    }
+
+    private func validateJSONLines(_ content: String) throws {
+        let lines = content.components(separatedBy: "\n")
+
+        for (index, lineText) in lines.enumerated() {
+            let trimmedLine = lineText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedLine.isEmpty else { continue }
+
+            do {
+                _ = try JSONSerialization.jsonObject(
+                    with: Data(trimmedLine.utf8),
+                    options: [.fragmentsAllowed]
+                )
+            } catch let jsonError as NSError {
+                let (_, column, message) = extractJSONErrorInfo(from: jsonError, originalContent: trimmedLine)
+                throw AppError.jsonFormatError(line: index + 1, column: column, message: message)
+            }
+        }
+    }
+
     /// 注册撤销操作，将旧内容压入撤销栈
     private func registerUndo(oldContent: String) {
         undoStack.append(oldContent)
@@ -386,8 +428,9 @@ final class EditorViewModel: ObservableObject {
 
     /// 根据字符偏移量计算行列号（1-based）
     private func lineAndColumn(for charIndex: Int, in text: String) -> (line: Int, column: Int)? {
-        guard charIndex >= 0 && charIndex <= text.count else { return nil }
-        let prefix = text.prefix(charIndex)
+        let nsText = text as NSString
+        guard charIndex >= 0 && charIndex <= nsText.length else { return nil }
+        let prefix = nsText.substring(to: charIndex)
         let lines = prefix.components(separatedBy: "\n")
         let line = lines.count
         let column = (lines.last?.count ?? 0) + 1
