@@ -85,6 +85,21 @@ struct SidebarView: View {
                 )
             }
         }
+        .onAppear {
+            syncExpandedSectionsWithSelection()
+        }
+        .onChange(of: appViewModel.selectedFile?.url.standardizedFileURL.path) { _, _ in
+            syncExpandedSectionsWithSelection()
+        }
+        .onChange(of: codexProfileViewModel.selectedProfileID) { _, _ in
+            syncExpandedSectionsWithSelection()
+        }
+        .onChange(of: claudeProfileViewModel.selectedProfileID) { _, _ in
+            syncExpandedSectionsWithSelection()
+        }
+        .onChange(of: appViewModel.agentCategories) { _, _ in
+            syncExpandedSectionsWithSelection()
+        }
     }
 
     private func envSection(_ category: EnvCategory) -> some View {
@@ -580,6 +595,37 @@ struct SidebarView: View {
                 expandCategory(categoryKey)
                 appViewModel.addFiles(panel.urls, to: categoryKey)
             }
+        }
+    }
+
+    private func syncExpandedSectionsWithSelection() {
+        if codexProfileViewModel.selectedProfileID != nil {
+            expandCategory(.agent(id: "codex"))
+            return
+        }
+
+        if claudeProfileViewModel.selectedProfileID != nil {
+            expandCategory(.agent(id: "claude"))
+            return
+        }
+
+        guard let selectedFile = appViewModel.selectedFile else { return }
+        let standardizedURL = selectedFile.url.standardizedFileURL
+
+        if appViewModel.envCategory?.files.contains(where: { $0.url.standardizedFileURL == standardizedURL }) == true {
+            expandCategory(.env)
+            return
+        }
+
+        if let category = appViewModel.agentCategories.first(where: { category in
+            category.files.contains { $0.url.standardizedFileURL == standardizedURL }
+        }) {
+            expandCategory(.agent(id: category.id))
+            return
+        }
+
+        if let match = AgentDefinitions.match(for: standardizedURL) {
+            expandCategory(.agent(id: match.definition.id))
         }
     }
 }
