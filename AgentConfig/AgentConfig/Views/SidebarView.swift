@@ -152,6 +152,8 @@ struct SidebarView: View {
 
                 Spacer()
 
+                CountBadge(count: codexProfileViewModel.profiles.count)
+                
                 Button {
                     codexProfileViewModel.addProfile()
                     if appViewModel.selectedFile != nil {
@@ -164,9 +166,8 @@ struct SidebarView: View {
                 }
                 .buttonStyle(.plain)
                 .help("新增 Codex Profile")
+                .padding(.trailing, 4)
 
-                CountBadge(count: codexProfileViewModel.profiles.count)
-                    .padding(.trailing, 10)
             }
 
             ForEach(codexProfileViewModel.profiles) { profile in
