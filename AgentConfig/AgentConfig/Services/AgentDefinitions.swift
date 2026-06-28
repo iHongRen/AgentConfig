@@ -85,34 +85,35 @@ enum AgentDefinitions {
                 AgentConfigEntry("~/.codex/config.toml")
             ]
         ),
-        AgentDefinition(
-            id: "gemini",
-            displayName: "Gemini CLI",
-            iconName: "GeminiCLI",
-            iconColor: Color(red: 0.22, green: 0.40, blue: 0.92),
-            configFiles: [
-                AgentConfigEntry("~/.gemini/settings.json")
-            ]
-        ),
-        AgentDefinition(
-            id: "opencode",
-            displayName: "OpenCode CLI",
-            iconName: "OpenCodeCLI",
-            iconColor: Color(red: 0.25, green: 0.55, blue: 0.85),
-            configFiles: [
-                AgentConfigEntry("~/.opencode"),
-                AgentConfigEntry("~/.config/opencode/opencode.json")
-            ]
-        ),
-        AgentDefinition(
-            id: "qwen",
-            displayName: "Qwen Code",
-            iconName: "QwenCode",
-            iconColor: Color(red: 0.50, green: 0.20, blue: 0.90),
-            configFiles: [
-                AgentConfigEntry("~/.qwen/settings.json")
-            ]
-        )
+        // 其他 Agent 配置暂时注释保留，后续需要时可直接恢复。
+//        AgentDefinition(
+//            id: "gemini",
+//            displayName: "Gemini CLI",
+//            iconName: "GeminiCLI",
+//            iconColor: Color(red: 0.22, green: 0.40, blue: 0.92),
+//            configFiles: [
+//                AgentConfigEntry("~/.gemini/settings.json")
+//            ]
+//        ),
+//        AgentDefinition(
+//            id: "opencode",
+//            displayName: "OpenCode CLI",
+//            iconName: "OpenCodeCLI",
+//            iconColor: Color(red: 0.25, green: 0.55, blue: 0.85),
+//            configFiles: [
+//                AgentConfigEntry("~/.opencode"),
+//                AgentConfigEntry("~/.config/opencode/opencode.json")
+//            ]
+//        ),
+//        AgentDefinition(
+//            id: "qwen",
+//            displayName: "Qwen Code",
+//            iconName: "QwenCode",
+//            iconColor: Color(red: 0.50, green: 0.20, blue: 0.90),
+//            configFiles: [
+//                AgentConfigEntry("~/.qwen/settings.json")
+//            ]
+//        )
     ]
 
     // MARK: - Convenience
