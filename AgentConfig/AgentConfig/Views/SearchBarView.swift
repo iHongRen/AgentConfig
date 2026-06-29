@@ -12,9 +12,15 @@ import SwiftUI
 /// VSCode 风格搜索栏：关键词高亮、上下导航、大小写开关
 struct SearchBarView: View {
 
+    enum Style {
+        case editorPanel
+        case toolbar
+    }
+
     @Binding var isVisible: Bool
     @ObservedObject var viewModel: EditorViewModel
     let onClose: () -> Void
+    var style: Style = .editorPanel
 
     @FocusState private var isSearchFieldFocused: Bool
 
@@ -28,6 +34,26 @@ struct SearchBarView: View {
         guard !viewModel.searchQuery.isEmpty else { return "" }
         guard !viewModel.searchResults.isEmpty else { return "无结果" }
         return "\(viewModel.currentSearchIndex + 1)/\(viewModel.searchResults.count)"
+    }
+
+    private var searchFieldWidth: CGFloat {
+        style == .toolbar ? 220 : 260
+    }
+
+    private var matchCountMinWidth: CGFloat {
+        style == .toolbar ? 38 : 44
+    }
+
+    private var outerHorizontalPadding: CGFloat {
+        style == .toolbar ? 8 : 12
+    }
+
+    private var outerHeight: CGFloat {
+        style == .toolbar ? 39 : 40
+    }
+
+    private var spacerMinLength: CGFloat {
+        style == .toolbar ? 4 : 8
     }
 
     // MARK: - Body
@@ -59,7 +85,7 @@ struct SearchBarView: View {
                     Text(matchCountText)
                         .font(.system(size: 12, weight: .medium).monospacedDigit())
                         .foregroundStyle(hasNoMatch ? Color(nsColor: .systemRed) : .secondary)
-                        .frame(minWidth: 44, alignment: .trailing)
+                        .frame(minWidth: matchCountMinWidth, alignment: .trailing)
                         .padding(.trailing, 4)
                 }
 
@@ -92,7 +118,7 @@ struct SearchBarView: View {
                             )
                     )
             )
-            .frame(width: 260)
+            .frame(width: searchFieldWidth)
 
             // ── 选项按钮 ────────────────────────────────────────────
             optionToggle(
@@ -113,7 +139,7 @@ struct SearchBarView: View {
                 disabled: true
             )
 
-            Spacer(minLength: 8)
+            Spacer(minLength: spacerMinLength)
 
             // ── 导航按钮 ────────────────────────────────────────────
             HStack(spacing: 2) {
@@ -137,10 +163,18 @@ struct SearchBarView: View {
             .buttonStyle(.plain)
             .help("关闭 (Esc)")
         }
-        .padding(.horizontal, 12)
-        .frame(height: 40)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .overlay(Divider(), alignment: .bottom)
+        .padding(.horizontal, outerHorizontalPadding)
+        .frame(height: outerHeight)
+        .background {
+            if style == .editorPanel {
+                Color(nsColor: .windowBackgroundColor)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if style == .editorPanel {
+                Divider()
+            }
+        }
         .onAppear {
             focusSearchField()
         }

@@ -32,7 +32,7 @@ struct ClaudeProfileEditorView: View {
                         codeCard(
                             title: "~/.claude/settings.json",
                             language: "JSON",
-                            subtitle: nil,
+                            helpText: "Claude 的主配置文件。应用时会整体写入磁盘上的 ~/.claude/settings.json。",
                             fileType: .json,
                             field: .settings,
                             textValue: profile.settingsText,
@@ -42,7 +42,7 @@ struct ClaudeProfileEditorView: View {
                         codeCard(
                             title: "~/.claude.json",
                             language: "JSON",
-                            subtitle: "默认展示 hasCompletedOnboarding，可自由编辑其他字段",
+                            helpText: "默认展示 hasCompletedOnboarding，可自由编辑其他字段。应用时会与当前 ~/.claude.json 做深度合并，而不是直接整文件覆盖。",
                             fileType: .json,
                             field: .claudeJSON,
                             textValue: profile.claudeJSONText,
@@ -52,7 +52,7 @@ struct ClaudeProfileEditorView: View {
                         codeCard(
                             title: "~/.zshrc",
                             language: "Shell",
-                            subtitle: "仅管理 AgentConfig Claude Profile 标记块",
+                            helpText: "仅管理 AgentConfig Claude Profile 标记块，不会覆盖整个 ~/.zshrc。",
                             fileType: .shell,
                             field: .zshrc,
                             textValue: profile.zshrcText,
@@ -224,7 +224,7 @@ struct ClaudeProfileEditorView: View {
     private func codeCard(
         title: String,
         language: String,
-        subtitle: String?,
+        helpText: String?,
         fileType: FileType,
         field: ClaudeProfileCodeField,
         textValue: String,
@@ -237,14 +237,6 @@ struct ClaudeProfileEditorView: View {
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .truncationMode(.middle)
-
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
 
                 Text(language)
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
@@ -260,6 +252,10 @@ struct ClaudeProfileEditorView: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
+
+                if let helpText {
+                    ProfileFieldHelpButton(title: title, message: helpText)
+                }
 
                 Spacer(minLength: 8)
 

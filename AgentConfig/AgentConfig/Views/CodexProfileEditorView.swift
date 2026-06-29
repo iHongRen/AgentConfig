@@ -32,7 +32,7 @@ struct CodexProfileEditorView: View {
                         codeCard(
                             title: "~/.codex/config.toml",
                             language: "TOML",
-                            icon: "gearshape",
+                            helpText: "Codex 的主配置文件。应用时会整体写入磁盘上的 ~/.codex/config.toml。",
                             fileType: .toml,
                             field: .config,
                             textValue: profile.configText,
@@ -42,7 +42,7 @@ struct CodexProfileEditorView: View {
                         codeCard(
                             title: "~/.codex/auth.json",
                             language: "JSON",
-                            icon: "curlybraces",
+                            helpText: "Codex 的认证信息文件。应用时会整体写入 ~/.codex/auth.json，请确认内容正确。",
                             fileType: .json,
                             field: .auth,
                             textValue: profile.authText,
@@ -52,7 +52,7 @@ struct CodexProfileEditorView: View {
                         codeCard(
                             title: "~/.zshrc",
                             language: "Shell",
-                            icon: "terminal",
+                            helpText: "仅管理 AgentConfig Codex Profile 标记块，不会覆盖整个 ~/.zshrc。",
                             fileType: .shell,
                             field: .zshrc,
                             textValue: profile.zshrcText,
@@ -224,7 +224,7 @@ struct CodexProfileEditorView: View {
     private func codeCard(
         title: String,
         language: String,
-        icon: String,
+        helpText: String,
         fileType: FileType,
         field: ProfileCodeField,
         textValue: String,
@@ -252,6 +252,8 @@ struct CodexProfileEditorView: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
+
+                ProfileFieldHelpButton(title: title, message: helpText)
 
                 Spacer(minLength: 8)
 

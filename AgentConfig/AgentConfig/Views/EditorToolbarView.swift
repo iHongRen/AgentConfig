@@ -28,6 +28,8 @@ struct EditorToolbarView: View {
 
     /// 点击搜索按钮时的回调
     var onShowSearch: (() -> Void)?
+    var isSearchBarVisible: Bool = false
+    var onCloseSearch: (() -> Void)?
 
     // MARK: - Private State
 
@@ -45,7 +47,19 @@ struct EditorToolbarView: View {
                 Spacer(minLength: 8)
 
                 HStack(spacing: 8) {
-                    searchButton
+                    if isSearchBarVisible {
+                        SearchBarView(
+                            isVisible: .constant(true),
+                            viewModel: editorViewModel,
+                            onClose: { onCloseSearch?() },
+                            style: .toolbar
+                        )
+                        .frame(maxWidth: 430, alignment: .trailing)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                    } else {
+                        searchButton
+                            .transition(.opacity)
+                    }
 
                     if isJSONFile {
                         formatButton
@@ -98,7 +112,7 @@ struct EditorToolbarView: View {
     }
 
     private var searchButton: some View {
-        toolbarIconButton(systemName: "magnifyingglass", isActive: false) {
+        toolbarIconButton(systemName: "magnifyingglass", isActive: isSearchBarVisible) {
             onShowSearch?()
         }
         .help("搜索")

@@ -310,6 +310,7 @@ struct CodeEditorView: NSViewRepresentable {
                 let end = min(range.location + range.length, length)
                 return NSValue(range: NSRange(location: location, length: end - location))
             }
+
             updateCursorPosition(for: textView)
 
             // 语法高亮完成后重新应用搜索背景色
@@ -360,7 +361,6 @@ struct CodeEditorView: NSViewRepresentable {
             width: CGFloat.greatestFiniteMagnitude,
             height: CGFloat.greatestFiniteMagnitude
         )
-        tv.layoutManager?.allowsNonContiguousLayout = true
 
         // 4. 外观
         let textColor = isDarkMode ? NSColor(white: 0.92, alpha: 1) : NSColor(white: 0.10, alpha: 1)
@@ -677,21 +677,14 @@ struct EditorView: View {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
                     isSearchBarVisible = true
                 }
-            }
+            },
+            isSearchBarVisible: isSearchBarVisible,
+            onCloseSearch: closeSearchBar
         )
     }
 
     private var editorContent: some View {
         VStack(spacing: 0) {
-            if isSearchBarVisible {
-                SearchBarView(
-                    isVisible: $isSearchBarVisible,
-                    viewModel: editorViewModel,
-                    onClose: closeSearchBar
-                )
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
-
             CodeEditorView(
                 text: $editorViewModel.content,
                 cursorLine: $cursorLine,
