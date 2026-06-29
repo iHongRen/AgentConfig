@@ -14,6 +14,7 @@ struct SearchBarView: View {
 
     @Binding var isVisible: Bool
     @ObservedObject var viewModel: EditorViewModel
+    let onClose: () -> Void
 
     @FocusState private var isSearchFieldFocused: Bool
 
@@ -46,6 +47,9 @@ struct SearchBarView: View {
                     .font(.system(size: 13))
                     .focused($isSearchFieldFocused)
                     .onSubmit { viewModel.nextMatch() }
+                    .onExitCommand {
+                        closeSearchBar()
+                    }
                     .onChange(of: viewModel.searchQuery) { _, q in
                         viewModel.search(query: q, caseSensitive: viewModel.isCaseSensitive)
                     }
@@ -137,11 +141,12 @@ struct SearchBarView: View {
         .frame(height: 40)
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay(Divider(), alignment: .bottom)
+        .onAppear {
+            focusSearchField()
+        }
         .onChange(of: isVisible) { _, visible in
             if visible {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    isSearchFieldFocused = true
-                }
+                focusSearchField()
             } else {
                 isSearchFieldFocused = false
             }
@@ -149,6 +154,9 @@ struct SearchBarView: View {
         .onKeyPress(.escape) {
             closeSearchBar()
             return .handled
+        }
+        .onExitCommand {
+            closeSearchBar()
         }
     }
 
@@ -215,12 +223,14 @@ struct SearchBarView: View {
     // MARK: - Actions
 
     private func closeSearchBar() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-            isVisible = false
-        }
-        viewModel.searchQuery = ""
-        viewModel.search(query: "", caseSensitive: viewModel.isCaseSensitive)
+        onClose()
         isSearchFieldFocused = false
     }
-}
 
+    private func focusSearchField() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            guard isVisible else { return }
+            isSearchFieldFocused = true
+        }
+    }
+}

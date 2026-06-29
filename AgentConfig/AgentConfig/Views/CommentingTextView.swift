@@ -7,12 +7,21 @@ import AppKit
 
 class CommentingTextView: NSTextView {
     var commentFileType: FileType = .plainText
+    var onEscape: (() -> Bool)?
 
     override func keyDown(with event: NSEvent) {
+        if handleEscape(event) {
+            return
+        }
         if handleCommentToggleShortcut(event) {
             return
         }
         super.keyDown(with: event)
+    }
+
+    private func handleEscape(_ event: NSEvent) -> Bool {
+        guard event.keyCode == 53 else { return false }
+        return onEscape?() ?? false
     }
 
     private func handleCommentToggleShortcut(_ event: NSEvent) -> Bool {

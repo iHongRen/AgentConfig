@@ -179,6 +179,7 @@ struct CodeEditorView: NSViewRepresentable {
     var currentSearchIndex: Int
     var scrollRevision: Int
     var isSearchBarVisible: Bool
+    var onEscape: (() -> Bool)?
 
     // MARK: Coordinator
 
@@ -381,6 +382,7 @@ struct CodeEditorView: NSViewRepresentable {
         tv.isGrammarCheckingEnabled = false
         tv.isContinuousSpellCheckingEnabled = false
         tv.commentFileType = fileType
+        tv.onEscape = onEscape
 
         // 6. Delegate
         tv.delegate = context.coordinator
@@ -451,6 +453,7 @@ struct CodeEditorView: NSViewRepresentable {
         }
 
         tv.commentFileType = fileType
+        tv.onEscape = onEscape
         context.coordinator.highlighter?.fileType = fileType
         context.coordinator.highlighter?.isDarkMode = isDarkMode
 
@@ -681,7 +684,11 @@ struct EditorView: View {
     private var editorContent: some View {
         VStack(spacing: 0) {
             if isSearchBarVisible {
-                SearchBarView(isVisible: $isSearchBarVisible, viewModel: editorViewModel)
+                SearchBarView(
+                    isVisible: $isSearchBarVisible,
+                    viewModel: editorViewModel,
+                    onClose: closeSearchBar
+                )
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
@@ -694,7 +701,8 @@ struct EditorView: View {
                 searchResults: editorViewModel.searchResults,
                 currentSearchIndex: editorViewModel.currentSearchIndex,
                 scrollRevision: editorViewModel.scrollRevision,
-                isSearchBarVisible: isSearchBarVisible
+                isSearchBarVisible: isSearchBarVisible,
+                onEscape: handleEscapeKey
             )
 
             statusBar
@@ -738,6 +746,20 @@ struct EditorView: View {
             .foregroundStyle(.secondary)
             .lineLimit(1)
             .padding(.horizontal, 13)
+    }
+
+    private func handleEscapeKey() -> Bool {
+        guard isSearchBarVisible else { return false }
+        closeSearchBar()
+        return true
+    }
+
+    private func closeSearchBar() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            isSearchBarVisible = false
+        }
+        editorViewModel.searchQuery = ""
+        editorViewModel.search(query: "", caseSensitive: editorViewModel.isCaseSensitive)
     }
 
     private var fileTypeLabel: String {
