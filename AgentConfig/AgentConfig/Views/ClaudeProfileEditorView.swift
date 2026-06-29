@@ -32,6 +32,7 @@ struct ClaudeProfileEditorView: View {
                         codeCard(
                             title: "~/.claude/settings.json",
                             language: "JSON",
+                            subtitle: nil,
                             fileType: .json,
                             field: .settings,
                             textValue: profile.settingsText,
@@ -41,10 +42,21 @@ struct ClaudeProfileEditorView: View {
                         codeCard(
                             title: "~/.claude.json",
                             language: "JSON",
+                            subtitle: "应用时仅覆盖真实文件中的对应字段",
                             fileType: .json,
                             field: .claudeJSON,
                             textValue: profile.claudeJSONText,
                             text: claudeJSONBinding(for: profile.id)
+                        )
+
+                        codeCard(
+                            title: "~/.zshrc",
+                            language: "Shell",
+                            subtitle: "仅管理 AgentConfig Claude Profile 标记块",
+                            fileType: .shell,
+                            field: .zshrc,
+                            textValue: profile.zshrcText,
+                            text: zshrcBinding(for: profile.id)
                         )
                     }
                     .padding(14)
@@ -212,6 +224,7 @@ struct ClaudeProfileEditorView: View {
     private func codeCard(
         title: String,
         language: String,
+        subtitle: String?,
         fileType: FileType,
         field: ClaudeProfileCodeField,
         textValue: String,
@@ -225,14 +238,22 @@ struct ClaudeProfileEditorView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
 
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+
                 Text(language)
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(languageTagStyle().foreground)
+                    .foregroundStyle(languageTagStyle(for: field).foreground)
                     .padding(.horizontal, 8)
                     .frame(height: 18)
                     .background(
                         Capsule()
-                            .fill(languageTagStyle().background)
+                            .fill(languageTagStyle(for: field).background)
                     )
 
                 Text("\(lineCount(in: text.wrappedValue)) 行")
@@ -344,6 +365,13 @@ struct ClaudeProfileEditorView: View {
         )
     }
 
+    private func zshrcBinding(for id: UUID) -> Binding<String> {
+        Binding(
+            get: { viewModel.profiles.first { $0.id == id }?.zshrcText ?? "" },
+            set: { viewModel.updateSelected(zshrcText: $0) }
+        )
+    }
+
     private func measuredHeightBinding(for field: ClaudeProfileCodeField) -> Binding<CGFloat> {
         Binding(
             get: { measuredEditorHeights[field] ?? ClaudeProfileEditorSizing.defaultHeight(for: field) },
@@ -379,6 +407,9 @@ struct ClaudeProfileEditorView: View {
         if let height = profile.claudeJSONEditorHeight {
             heights[.claudeJSON] = ClaudeProfileEditorSizing.clampedCustomHeight(CGFloat(height))
         }
+        if let height = profile.zshrcEditorHeight {
+            heights[.zshrc] = ClaudeProfileEditorSizing.clampedCustomHeight(CGFloat(height))
+        }
         return heights
     }
 
@@ -389,6 +420,8 @@ struct ClaudeProfileEditorView: View {
             viewModel.updateSelectedEditorHeight(settingsEditorHeight: storedHeight)
         case .claudeJSON:
             viewModel.updateSelectedEditorHeight(claudeJSONEditorHeight: storedHeight)
+        case .zshrc:
+            viewModel.updateSelectedEditorHeight(zshrcEditorHeight: storedHeight)
         }
     }
 
@@ -412,9 +445,15 @@ struct ClaudeProfileEditorView: View {
         return .secondary
     }
 
-    private func languageTagStyle() -> (foreground: Color, background: Color) {
-        let color = Color(red: 0.18, green: 0.64, blue: 0.42)
-        return (color, color.opacity(0.16))
+    private func languageTagStyle(for field: ClaudeProfileCodeField) -> (foreground: Color, background: Color) {
+        switch field {
+        case .settings, .claudeJSON:
+            let color = Color(red: 0.18, green: 0.64, blue: 0.42)
+            return (color, color.opacity(0.16))
+        case .zshrc:
+            let color = Color(red: 0.46, green: 0.40, blue: 0.90)
+            return (color, color.opacity(0.16))
+        }
     }
 
     private func lineCount(in text: String) -> Int {
@@ -453,6 +492,7 @@ struct ClaudeProfileEditorView: View {
 private enum ClaudeProfileCodeField: Hashable {
     case settings
     case claudeJSON
+    case zshrc
 
     var defaultHeight: CGFloat {
         switch self {
@@ -460,6 +500,8 @@ private enum ClaudeProfileCodeField: Hashable {
             return 220
         case .claudeJSON:
             return 220
+        case .zshrc:
+            return 150
         }
     }
 }

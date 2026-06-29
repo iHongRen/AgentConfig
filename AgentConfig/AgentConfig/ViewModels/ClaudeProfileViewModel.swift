@@ -77,7 +77,12 @@ final class ClaudeProfileViewModel: ObservableObject {
         profiles.first(where: \.isActive)?.id ?? profiles.first?.id
     }
 
-    func updateSelected(name: String? = nil, settingsText: String? = nil, claudeJSONText: String? = nil) {
+    func updateSelected(
+        name: String? = nil,
+        settingsText: String? = nil,
+        claudeJSONText: String? = nil,
+        zshrcText: String? = nil
+    ) {
         guard let index = selectedIndex else { return }
         var didChange = false
 
@@ -96,6 +101,10 @@ final class ClaudeProfileViewModel: ObservableObject {
             profiles[index].claudeJSONText = claudeJSONText
             didChange = true
         }
+        if let zshrcText, profiles[index].zshrcText != zshrcText {
+            profiles[index].zshrcText = zshrcText
+            didChange = true
+        }
 
         guard didChange else { return }
         profiles[index].isDirty = isProfileDirty(profiles[index])
@@ -104,7 +113,8 @@ final class ClaudeProfileViewModel: ObservableObject {
 
     func updateSelectedEditorHeight(
         settingsEditorHeight: Double? = nil,
-        claudeJSONEditorHeight: Double? = nil
+        claudeJSONEditorHeight: Double? = nil,
+        zshrcEditorHeight: Double? = nil
     ) {
         guard let index = selectedIndex else { return }
         var didChange = false
@@ -115,6 +125,10 @@ final class ClaudeProfileViewModel: ObservableObject {
         }
         if let claudeJSONEditorHeight, profiles[index].claudeJSONEditorHeight != claudeJSONEditorHeight {
             profiles[index].claudeJSONEditorHeight = claudeJSONEditorHeight
+            didChange = true
+        }
+        if let zshrcEditorHeight, profiles[index].zshrcEditorHeight != zshrcEditorHeight {
+            profiles[index].zshrcEditorHeight = zshrcEditorHeight
             didChange = true
         }
 
@@ -128,6 +142,7 @@ final class ClaudeProfileViewModel: ObservableObject {
             name: "新配置 \(profiles.count + 1)",
             settingsText: source.settingsText,
             claudeJSONText: source.claudeJSONText,
+            zshrcText: source.zshrcText,
             isDirty: true
         )
         profiles.append(profile)
@@ -168,6 +183,7 @@ final class ClaudeProfileViewModel: ObservableObject {
             }
             profiles[selectedIndex].appliedSettingsText = selectedProfile.settingsText
             profiles[selectedIndex].appliedClaudeJSONText = selectedProfile.claudeJSONText
+            profiles[selectedIndex].appliedZshrcText = selectedProfile.zshrcText
             profiles[selectedIndex].isDirty = false
             lastAppliedProfileName = profiles[selectedIndex].name
             lastErrorMessage = nil
@@ -187,6 +203,7 @@ final class ClaudeProfileViewModel: ObservableObject {
     private func isProfileDirty(_ profile: ClaudeProfile) -> Bool {
         normalizedJSON(profile.settingsText) != normalizedJSON(profile.appliedSettingsText)
             || normalizedJSON(profile.claudeJSONText) != normalizedJSON(profile.appliedClaudeJSONText)
+            || normalizedText(profile.zshrcText) != normalizedText(profile.appliedZshrcText)
     }
 
     private func normalizedText(_ text: String) -> String {
@@ -220,17 +237,18 @@ final class ClaudeProfileViewModel: ObservableObject {
     private func makeFallbackProfile() -> ClaudeProfile {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let settingsURL = home.appendingPathComponent(".claude", isDirectory: true).appendingPathComponent("settings.json")
-        let claudeJSONURL = home.appendingPathComponent(".claude.json")
 
         let settingsText = (try? String(contentsOf: settingsURL, encoding: .utf8)) ?? "{}"
-        let claudeJSONText = (try? String(contentsOf: claudeJSONURL, encoding: .utf8)) ?? "{}"
+        let claudeJSONText = ClaudeProfile.defaultClaudeJSONText
 
         return ClaudeProfile(
             name: "新配置",
             settingsText: settingsText,
             claudeJSONText: claudeJSONText,
+            zshrcText: ClaudeProfile.defaultZshrcText,
             appliedSettingsText: settingsText,
             appliedClaudeJSONText: claudeJSONText,
+            appliedZshrcText: ClaudeProfile.defaultZshrcText,
             isActive: true
         )
     }
