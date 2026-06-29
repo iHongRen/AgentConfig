@@ -15,12 +15,14 @@ final class LineNumberRulerView: NSRulerView {
     weak var textView: NSTextView?
 
     private let lineNumberFont = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+    private var cachedDigitCount = 2
 
     init(scrollView: NSScrollView, textView: NSTextView) {
         self.textView = textView
         super.init(scrollView: scrollView, orientation: .verticalRuler)
         self.clientView = textView
         self.ruleThickness = 40
+        recalculateMetrics()
     }
 
     required init(coder: NSCoder) {
@@ -28,10 +30,7 @@ final class LineNumberRulerView: NSRulerView {
     }
 
     override var requiredThickness: CGFloat {
-        guard let text = textView?.string else { return 40 }
-        let lineCount = max(1, text.components(separatedBy: "\n").count)
-        let digits = max(2, String(lineCount).count)
-        let sample = String(repeating: "9", count: digits) as NSString
+        let sample = String(repeating: "9", count: cachedDigitCount) as NSString
         let w = sample.size(withAttributes: [.font: lineNumberFont]).width
         return w + 16
     }
@@ -56,6 +55,7 @@ final class LineNumberRulerView: NSRulerView {
 
         let visibleRect = scrollView?.contentView.bounds ?? bounds
         let containerOrigin = textView.textContainerOrigin
+        let visibleTextRect = visibleRect.offsetBy(dx: -containerOrigin.x, dy: -containerOrigin.y)
         let attrs: [NSAttributedString.Key: Any] = [
             .font: lineNumberFont,
             .foregroundColor: NSColor.secondaryLabelColor
@@ -63,17 +63,28 @@ final class LineNumberRulerView: NSRulerView {
 
         let fullText = textView.string as NSString
         let totalLength = fullText.length
-        var lineNumber = 1
-        var charIndex = 0
-
-        layoutManager.ensureLayout(for: textContainer)
+        let visibleGlyphRange = layoutManager.glyphRange(forBoundingRect: visibleTextRect, in: textContainer)
+        let firstVisibleGlyphIndex = min(
+            visibleGlyphRange.location,
+            max(layoutManager.numberOfGlyphs - 1, 0)
+        )
+        let firstVisibleCharacterIndex = layoutManager.numberOfGlyphs > 0
+            ? layoutManager.characterIndexForGlyph(at: firstVisibleGlyphIndex)
+            : 0
+        let firstLineCharacterIndex = fullText.lineRange(
+            for: NSRange(location: min(firstVisibleCharacterIndex, totalLength), length: 0)
+        ).location
+        var lineNumber = Self.lineNumber(at: firstLineCharacterIndex, in: fullText)
+        var charIndex = firstLineCharacterIndex
 
         while charIndex <= totalLength {
             let glyphRange = layoutManager.glyphRange(
                 forCharacterRange: NSRange(location: charIndex, length: 0),
                 actualCharacterRange: nil
             )
-            guard glyphRange.location < layoutManager.numberOfGlyphs || charIndex == 0 else { break }
+            guard glyphRange.location < layoutManager.numberOfGlyphs || (charIndex == 0 && totalLength == 0) else {
+                break
+            }
 
             var lineFragmentRect = layoutManager.lineFragmentRect(
                 forGlyphAt: min(glyphRange.location, max(0, layoutManager.numberOfGlyphs - 1)),
@@ -106,15 +117,57 @@ final class LineNumberRulerView: NSRulerView {
         }
     }
 
-    func refresh() {
+    func refresh(recalculateMetrics: Bool = false) {
+        if recalculateMetrics {
+            self.recalculateMetrics()
+        }
         ruleThickness = requiredThickness
         needsDisplay = true
+    }
+
+    private func recalculateMetrics() {
+        guard let text = textView?.string else {
+            cachedDigitCount = 2
+            return
+        }
+
+        let lineCount = Self.countLines(in: text)
+        cachedDigitCount = max(2, String(lineCount).count)
+    }
+
+    private static func countLines(in text: String) -> Int {
+        guard !text.isEmpty else { return 1 }
+
+        var lineCount = 1
+        for codeUnit in text.utf16 where codeUnit == 10 {
+            lineCount += 1
+        }
+        return lineCount
+    }
+
+    private static func lineNumber(at characterIndex: Int, in text: NSString) -> Int {
+        guard characterIndex > 0 else { return 1 }
+
+        var lineNumber = 1
+        var searchLocation = 0
+
+        while searchLocation < characterIndex {
+            let range = NSRange(location: searchLocation, length: characterIndex - searchLocation)
+            let newlineRange = text.range(of: "\n", range: range)
+            guard newlineRange.location != NSNotFound else { break }
+            lineNumber += 1
+            searchLocation = newlineRange.location + 1
+        }
+
+        return lineNumber
     }
 }
 
 // MARK: - CodeEditorView
 
 struct CodeEditorView: NSViewRepresentable {
+
+    private static let deferredHighlightCharacterThreshold = 50_000
 
     @Binding var text: String
     @Binding var cursorLine: Int
@@ -144,9 +197,14 @@ struct CodeEditorView: NSViewRepresentable {
         var lastSearchHighlightDarkMode: Bool?
         /// 语法高亮完成后重新应用搜索背景色的回调（由 updateNSView 注入）
         var reapplySearchHighlights: ((NSTextView) -> Void)?
+        var pendingHighlightTask: Task<Void, Never>?
 
         init(_ parent: CodeEditorView) {
             self.parent = parent
+        }
+
+        deinit {
+            pendingHighlightTask?.cancel()
         }
 
         func textDidChange(_ notification: Notification) {
@@ -168,16 +226,9 @@ struct CodeEditorView: NSViewRepresentable {
                 parent.text = newText
             }
 
-            if finishedMarkedText {
-                DispatchQueue.main.async { [weak self, weak tv] in
-                    guard let self, let tv else { return }
-                    self.applyHighlightingPreservingSelection(in: tv)
-                    self.refreshLineNumberRuler(for: tv)
-                }
-            } else {
-                applyHighlightingPreservingSelection(in: tv)
-                refreshLineNumberRuler(for: tv)
-            }
+            updateCursorPosition(for: tv)
+            scheduleHighlighting(for: tv)
+            refreshLineNumberRuler(for: tv, recalculateMetrics: finishedMarkedText)
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
@@ -189,11 +240,8 @@ struct CodeEditorView: NSViewRepresentable {
                 if parent.text != newText {
                     parent.text = newText
                 }
-                DispatchQueue.main.async { [weak self, weak tv] in
-                    guard let self, let tv else { return }
-                    self.applyHighlightingPreservingSelection(in: tv)
-                    self.refreshLineNumberRuler(for: tv)
-                }
+                scheduleHighlighting(for: tv)
+                refreshLineNumberRuler(for: tv, recalculateMetrics: true)
             }
 
             updateCursorPosition(for: tv)
@@ -218,10 +266,29 @@ struct CodeEditorView: NSViewRepresentable {
             }
         }
 
-        func refreshLineNumberRuler(for textView: NSTextView) {
+        func refreshLineNumberRuler(for textView: NSTextView, recalculateMetrics: Bool = false) {
             if let sv = textView.enclosingScrollView,
                let ruler = sv.verticalRulerView as? LineNumberRulerView {
-                ruler.refresh()
+                ruler.refresh(recalculateMetrics: recalculateMetrics)
+            }
+        }
+
+        func scheduleHighlighting(for textView: NSTextView, immediate: Bool? = nil) {
+            pendingHighlightTask?.cancel()
+
+            let shouldApplyImmediately = immediate ?? !shouldDeferHighlighting(for: textView)
+            if shouldApplyImmediately {
+                applyHighlightingPreservingSelection(in: textView)
+                return
+            }
+
+            pendingHighlightTask = Task { [weak self, weak textView] in
+                await Task.yield()
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    guard let self, let textView else { return }
+                    self.applyHighlightingPreservingSelection(in: textView)
+                }
             }
         }
 
@@ -246,6 +313,20 @@ struct CodeEditorView: NSViewRepresentable {
 
             // 语法高亮完成后重新应用搜索背景色
             reapplySearchHighlights?(textView)
+        }
+
+        private func shouldDeferHighlighting(for textView: NSTextView) -> Bool {
+            guard let storage = textView.textStorage else { return false }
+
+            let isLargeDocument = storage.length >= CodeEditorView.deferredHighlightCharacterThreshold
+            guard isLargeDocument else { return false }
+
+            switch parent.fileType {
+            case .json, .jsonc, .json5, .jsonl:
+                return true
+            case .yaml, .toml, .shell, .plainText:
+                return false
+            }
         }
     }
 
@@ -278,6 +359,7 @@ struct CodeEditorView: NSViewRepresentable {
             width: CGFloat.greatestFiniteMagnitude,
             height: CGFloat.greatestFiniteMagnitude
         )
+        tv.layoutManager?.allowsNonContiguousLayout = true
 
         // 4. 外观
         let textColor = isDarkMode ? NSColor(white: 0.92, alpha: 1) : NSColor(white: 0.10, alpha: 1)
@@ -328,15 +410,16 @@ struct CodeEditorView: NSViewRepresentable {
             .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular),
             .foregroundColor: textColor
         ]
-        
-        // 手动触发一次高亮
-        if let storage = tv.textStorage, storage.length > 0 {
-            storage.beginEditing()
-            context.coordinator.highlighter?.applyHighlighting(to: storage)
-            storage.endEditing()
-        }
-        
-        ruler.refresh()
+
+        context.coordinator.lastHighlightedFileType = fileType
+        context.coordinator.lastHighlightedIsDarkMode = isDarkMode
+        context.coordinator.lastSearchResultsHash = searchResultsHash(for: searchResults)
+        context.coordinator.lastCurrentSearchIndex = currentSearchIndex
+        context.coordinator.lastSearchHighlightDarkMode = isDarkMode
+        context.coordinator.lastScrollRevision = scrollRevision
+        context.coordinator.scheduleHighlighting(for: tv)
+
+        ruler.refresh(recalculateMetrics: true)
         context.coordinator.updateCursorPosition(for: tv)
 
         return scrollView
@@ -393,7 +476,7 @@ struct CodeEditorView: NSViewRepresentable {
 
         // 内容变化、fileType 变化、深浅色变化时重新高亮
         if !isComposingMarkedText && (contentChanged || fileTypeChanged || darkModeChanged) {
-            context.coordinator.applyHighlightingPreservingSelection(in: tv)
+            context.coordinator.scheduleHighlighting(for: tv)
             context.coordinator.lastHighlightedFileType = fileType
             context.coordinator.lastHighlightedIsDarkMode = isDarkMode
         }
@@ -415,9 +498,12 @@ struct CodeEditorView: NSViewRepresentable {
 
         // 刷新行号
         if let ruler = scrollView.verticalRulerView as? LineNumberRulerView {
-            ruler.refresh()
+            let needsMetricRefresh = contentChanged
+            ruler.refresh(recalculateMetrics: needsMetricRefresh)
         }
-        context.coordinator.updateCursorPosition(for: tv)
+        if contentChanged {
+            context.coordinator.updateCursorPosition(for: tv)
+        }
 
         // 应用搜索高亮
         applySearchHighlights(to: tv, context: context)
@@ -425,9 +511,9 @@ struct CodeEditorView: NSViewRepresentable {
         // 注入回调，确保语法高亮后搜索背景色不丢失
         context.coordinator.reapplySearchHighlights = { [searchResults, currentSearchIndex] textView in
             guard let storage = textView.textStorage else { return }
+            guard !searchResults.isEmpty else { return }
             let fullRange = NSRange(location: 0, length: storage.length)
             storage.removeAttribute(.backgroundColor, range: fullRange)
-            guard !searchResults.isEmpty else { return }
             let allColor: NSColor = self.isDarkMode
                 ? NSColor(red: 0.80, green: 0.65, blue: 0.10, alpha: 0.45)
                 : NSColor(red: 0.98, green: 0.85, blue: 0.10, alpha: 0.55)
@@ -448,13 +534,7 @@ struct CodeEditorView: NSViewRepresentable {
     private func applySearchHighlights(to tv: NSTextView, context: Context) {
         guard let storage = tv.textStorage else { return }
 
-        var hasher = Hasher()
-        hasher.combine(searchResults.count)
-        for range in searchResults {
-            hasher.combine(range.location)
-            hasher.combine(range.length)
-        }
-        let resultsHash = hasher.finalize()
+        let resultsHash = searchResultsHash(for: searchResults)
 
         let needsRepaint = context.coordinator.lastSearchResultsHash != resultsHash
             || context.coordinator.lastCurrentSearchIndex != currentSearchIndex
@@ -500,6 +580,16 @@ struct CodeEditorView: NSViewRepresentable {
 
     private var editorBackgroundColor: NSColor {
         isDarkMode ? NSColor(white: 0.12, alpha: 1) : NSColor(white: 0.985, alpha: 1)
+    }
+
+    private func searchResultsHash(for ranges: [NSRange]) -> Int {
+        var hasher = Hasher()
+        hasher.combine(ranges.count)
+        for range in ranges {
+            hasher.combine(range.location)
+            hasher.combine(range.length)
+        }
+        return hasher.finalize()
     }
 }
 

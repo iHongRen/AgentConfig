@@ -227,38 +227,72 @@ final class SyntaxHighlighter: NSObject, NSTextStorageDelegate {
             in: textStorage.string, options: [], range: fullRange
         )
         let stringRanges = stringMatches.map(\.range)
+        let nonStringRanges = invertedRanges(from: stringRanges, within: fullRange)
 
         for stringRange in stringRanges where isValid(stringRange, in: source) {
             textStorage.addAttribute(.foregroundColor, value: stringColor, range: stringRange)
         }
 
         for rule in rules.dropFirst() {
-            let matches = rule.pattern.matches(in: textStorage.string, options: [], range: fullRange)
-            for match in matches {
-                let highlightRange = match.numberOfRanges > 1 ? match.range(at: 1) : match.range
-                guard isValid(highlightRange, in: source) else { continue }
+            let isKeyName = rule.color == keyNameColor
+            let isComment = rule.color == commentColor
 
-                // 注释优先级最高，直接覆盖；键名颜色需要覆盖字符串颜色（key 本身就是字符串）；
-                // 其余规则（数字、布尔值）不应命中字符串内部，跳过相交范围。
-                let isKeyName = rule.color == keyNameColor
-                let isComment = rule.color == commentColor
-                if !isKeyName && !isComment && intersectsAnyStringRange(highlightRange, stringRanges: stringRanges) {
-                    continue
-                }
+            let candidateRanges: [NSRange]
+            if isKeyName || isComment {
+                candidateRanges = [fullRange]
+            } else {
+                candidateRanges = nonStringRanges
+            }
 
-                textStorage.addAttribute(
-                    .foregroundColor, value: rule.color, range: highlightRange
+            for candidateRange in candidateRanges where candidateRange.length > 0 {
+                let matches = rule.pattern.matches(
+                    in: textStorage.string,
+                    options: [],
+                    range: candidateRange
                 )
+                for match in matches {
+                    let highlightRange = match.numberOfRanges > 1 ? match.range(at: 1) : match.range
+                    guard isValid(highlightRange, in: source) else { continue }
+                    textStorage.addAttribute(
+                        .foregroundColor,
+                        value: rule.color,
+                        range: highlightRange
+                    )
+                }
             }
         }
     }
 
-    private func intersectsAnyStringRange(_ range: NSRange, stringRanges: [NSRange]) -> Bool {
-        stringRanges.contains { NSIntersectionRange($0, range).length > 0 }
-    }
-
     private func isValid(_ range: NSRange, in source: NSString) -> Bool {
         range.location != NSNotFound && NSMaxRange(range) <= source.length
+    }
+
+    private func invertedRanges(from ranges: [NSRange], within fullRange: NSRange) -> [NSRange] {
+        guard !ranges.isEmpty else { return [fullRange] }
+
+        var results: [NSRange] = []
+        var currentLocation = fullRange.location
+        let fullRangeEnd = NSMaxRange(fullRange)
+
+        for range in ranges {
+            guard range.location != NSNotFound else { continue }
+
+            let clampedStart = max(range.location, fullRange.location)
+            let clampedEnd = min(NSMaxRange(range), fullRangeEnd)
+            guard clampedStart < clampedEnd else { continue }
+
+            if currentLocation < clampedStart {
+                results.append(NSRange(location: currentLocation, length: clampedStart - currentLocation))
+            }
+
+            currentLocation = max(currentLocation, clampedEnd)
+        }
+
+        if currentLocation < fullRangeEnd {
+            results.append(NSRange(location: currentLocation, length: fullRangeEnd - currentLocation))
+        }
+
+        return results
     }
 
     // MARK: - YAML Rules

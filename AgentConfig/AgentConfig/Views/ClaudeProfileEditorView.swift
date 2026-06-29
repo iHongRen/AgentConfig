@@ -42,7 +42,7 @@ struct ClaudeProfileEditorView: View {
                         codeCard(
                             title: "~/.claude.json",
                             language: "JSON",
-                            subtitle: "应用时仅覆盖真实文件中的对应字段",
+                            subtitle: "默认展示 hasCompletedOnboarding，可自由编辑其他字段",
                             fileType: .json,
                             field: .claudeJSON,
                             textValue: profile.claudeJSONText,

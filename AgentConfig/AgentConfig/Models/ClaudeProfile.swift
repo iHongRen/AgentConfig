@@ -11,7 +11,6 @@ struct ClaudeProfile: Identifiable, Codable, Equatable {
       "hasCompletedOnboarding": true
     }
     """
-
     static let defaultZshrcText = ""
 
     let id: UUID
