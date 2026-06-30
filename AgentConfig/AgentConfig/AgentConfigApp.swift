@@ -24,6 +24,35 @@ extension Notification.Name {
     static let appDidBecomeActive = Notification.Name("AgentConfig.appDidBecomeActive")
 }
 
+// MARK: - About Window Controller
+
+final class AboutWindowController: NSWindowController, NSWindowDelegate {
+
+    var onClose: (() -> Void)?
+
+    convenience init() {
+        let hostingView = NSHostingView(rootView: AboutView())
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 390),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+
+        window.title = NSLocalizedString("menu.about", value: "About AgentConfig", comment: "About window title")
+        window.center()
+        window.contentView = hostingView
+        window.isReleasedWhenClosed = false
+
+        self.init(window: window)
+        window.delegate = self
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        onClose?()
+    }
+}
+
 // MARK: - CommandCoordinator
 
 /// 桥接 EditorView 的回调到 app 级菜单命令
@@ -55,6 +84,10 @@ struct AgentConfigApp: App {
     @StateObject private var codexProfileViewModel = CodexProfileViewModel()
     @StateObject private var claudeProfileViewModel = ClaudeProfileViewModel()
     @StateObject private var saveCoordinator = CommandCoordinator()
+
+    // MARK: - Window Controllers
+
+    @State private var aboutWindowController: AboutWindowController?
 
     // MARK: - Appearance
 
@@ -148,16 +181,21 @@ struct AgentConfigApp: App {
 
     /// 显示关于窗口
     private func showAboutWindow() {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 390),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = NSLocalizedString("menu.about", value: "About AgentConfig", comment: "About window title")
-        window.center()
-        window.contentView = NSHostingView(rootView: AboutView())
-        window.makeKeyAndOrderFront(nil)
+        if let aboutWindowController {
+            aboutWindowController.showWindow(nil)
+            aboutWindowController.window?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let controller = AboutWindowController()
+        controller.onClose = {
+            self.aboutWindowController = nil
+        }
+        aboutWindowController = controller
+        controller.showWindow(nil)
+        controller.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
 

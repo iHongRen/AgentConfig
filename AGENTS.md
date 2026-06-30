@@ -101,7 +101,4 @@ Each service is defined as a protocol + implementation:
 5. Add `@StateObject` in `AgentConfigApp`, pass to `MainContentView` and `SidebarView`
 6. Add selection check in `MainContentView` detail-pane routing
 
-### Removed features
-
-- There is no Git history/restore service in the app. Do not reintroduce `GitService`, `GitViewModel`, `GitHistoryView`, or Git error cases unless explicitly requested.
-- There is no configuration examples pane. Do not reintroduce `ConfigExamples`, `ConfigExample`, or `ConfigExamplesPaneView` unless explicitly requested.
+###  DO NOT send optional commentary
