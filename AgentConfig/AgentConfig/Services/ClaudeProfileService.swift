@@ -52,7 +52,7 @@ final class ClaudeProfileService: ClaudeProfileServiceProtocol {
         let claudeJSONText = ClaudeProfile.defaultClaudeJSONText
         let zshrcText = defaultManagedZshrcBlockContent()
         return ClaudeProfile(
-            name: "新配置",
+            name: L10n.tr("profile.newName", value: "New Profile"),
             settingsText: settingsText,
             claudeJSONText: claudeJSONText,
             zshrcText: zshrcText,

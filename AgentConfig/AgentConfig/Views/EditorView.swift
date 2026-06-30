@@ -42,7 +42,7 @@ final class LineNumberRulerView: NSRulerView {
         NSBezierPath(rect: bounds).setClip()
 
         let isDark = textView?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        (isDark ? NSColor(white: 0.13, alpha: 1) : NSColor(white: 0.985, alpha: 1)).setFill()
+        (isDark ? NSColor.textBackgroundColor : NSColor.textBackgroundColor).setFill()
         bounds.fill()
 
         drawLineNumbers()
@@ -582,7 +582,7 @@ struct CodeEditorView: NSViewRepresentable {
     }
 
     private var editorBackgroundColor: NSColor {
-        isDarkMode ? NSColor(white: 0.12, alpha: 1) : NSColor(white: 0.985, alpha: 1)
+        NSColor.textBackgroundColor
     }
 
     private func searchResultsHash(for ranges: [NSRange]) -> Int {
@@ -643,24 +643,24 @@ struct EditorView: View {
             }
         }
         .alert(
-            "检测到外部修改",
+            L10n.tr("editor.externalChange.title", value: "External Changes Detected"),
             isPresented: $editorViewModel.hasExternalConflict
         ) {
-            Button("保存 App 中的修改") {
+            Button(L10n.tr("editor.externalChange.keepLocal", value: "Keep App Changes")) {
                 Task { await editorViewModel.resolveConflict(keepLocal: true) }
             }
-            Button("使用外部版本", role: .destructive) {
+            Button(L10n.tr("editor.externalChange.useExternal", value: "Use External Version"), role: .destructive) {
                 Task { await editorViewModel.resolveConflict(keepLocal: false) }
             }
         } message: {
-            Text("当前文件已在外部更新。请选择将 App 中未保存的修改写回文件，或使用外部版本覆盖当前编辑区。")
+            Text(L10n.tr("editor.externalChange.message", value: "This file changed outside the app. Choose whether to write the app's unsaved changes back to disk or replace the editor with the external version."))
         }
-        .alert("保存失败", isPresented: saveErrorBinding) {
-            Button("确定", role: .destructive) {
+        .alert(L10n.tr("editor.saveFailed.title", value: "Save Failed"), isPresented: saveErrorBinding) {
+            Button(L10n.tr("editor.saveFailed.ok", value: "OK"), role: .destructive) {
                 saveErrorMessage = nil
             }
         } message: {
-            Text(saveErrorMessage ?? "保存时发生未知错误。")
+            Text(saveErrorMessage ?? L10n.tr("editor.saveFailed.message", value: "An unknown error occurred while saving."))
         }
         .onChange(of: editorViewModel.currentFile) { _, newFile in
             cursorLine = 1
@@ -707,11 +707,11 @@ struct EditorView: View {
             Image(systemName: "doc.text")
                 .font(.system(size: 44))
                 .foregroundStyle(.tertiary)
-            Text("选择左侧文件开始编辑")
+            Text(L10n.tr("editor.empty.title", value: "Select a file to start editing"))
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
-            Text("从侧边栏选择一个配置文件")
+            Text(L10n.tr("editor.empty.subtitle", value: "Choose a configuration file from the sidebar"))
                 .font(.callout)
                 .foregroundStyle(.tertiary)
         }
@@ -723,7 +723,7 @@ struct EditorView: View {
         HStack(spacing: 0) {
             Spacer()
 
-            statusText("行 \(cursorLine), 列 \(cursorColumn)")
+            statusText(L10n.format("editor.status.lineColumn", value: "Line %d, Column %d", cursorLine, cursorColumn))
             statusText("UTF-8")
             statusText(fileTypeLabel)
             statusText("LF")

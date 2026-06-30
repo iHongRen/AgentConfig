@@ -91,14 +91,7 @@ struct AboutView: View {
     // MARK: - Helpers
 
     private var versionText: String {
-        String(
-            format: NSLocalizedString(
-                "about.version.build",
-                value: "Version %@",
-                comment: "About view version text"
-            ),
-            appVersion
-        )
+        L10n.format("about.version.build", value: "Version %@", appVersion)
     }
 
     private func linkButton(

@@ -129,7 +129,7 @@ struct FileListView: View {
             Spacer()
 
             // 创建按钮
-            Button(NSLocalizedString("创建", comment: "Create missing env file")) {
+            Button(L10n.tr("fileList.create", value: "Create")) {
                 createFile(at: url)
             }
             .buttonStyle(.bordered)
@@ -141,7 +141,7 @@ struct FileListView: View {
     private var emptyStateView: some View {
         HStack {
             Spacer()
-            Text(NSLocalizedString("暂无文件", comment: "No files in category"))
+            Text(L10n.tr("fileList.empty", value: "No files"))
                 .foregroundStyle(.secondary)
                 .font(.callout)
             Spacer()
@@ -157,7 +157,7 @@ struct FileListView: View {
         case .agent(let category):
             return category.displayName
         case .env:
-            return NSLocalizedString("环境变量", comment: "Environment variables category title")
+            return L10n.tr("fileList.envTitle", value: "Environment")
         }
     }
 
@@ -182,4 +182,3 @@ struct FileListView: View {
         }
     }
 }
-

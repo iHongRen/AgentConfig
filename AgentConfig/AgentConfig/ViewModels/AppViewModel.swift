@@ -315,15 +315,6 @@ final class AppViewModel: ObservableObject {
     /// 通过更新 `UserDefaults["AppleLanguages"]` 并触发 UI 重建实现即时切换。
     /// - Parameter language: 目标语言
     func applyLanguage(_ language: AppLanguage) {
-        switch language {
-        case .en:
-            UserDefaults.standard.set(["en"], forKey: "AppleLanguages")
-        case .zhHans:
-            UserDefaults.standard.set(["zh-Hans"], forKey: "AppleLanguages")
-        case .system:
-            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
-        }
-        UserDefaults.standard.synchronize()
         // 发送通知触发 UI 重建（由 AgentConfigApp 监听）
         NotificationCenter.default.post(name: .languageDidChange, object: nil)
     }

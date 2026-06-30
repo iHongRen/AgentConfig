@@ -23,8 +23,8 @@ struct ProfileFieldHelpButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("文件说明")
-        .accessibilityLabel("文件说明")
+        .help(L10n.tr("profile.help", value: "File Help"))
+        .accessibilityLabel(L10n.tr("profile.help.accessibility", value: "File Help"))
         .popover(isPresented: $isPresented, arrowEdge: .top) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(title)

@@ -25,24 +25,28 @@ enum AppError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .fileReadFailed(let url, let error):
-            return NSLocalizedString(
+            return L10n.format(
                 "error.fileReadFailed",
-                value: "Failed to read file \"\(url.lastPathComponent)\": \(error.localizedDescription)",
-                comment: "Error when reading a file fails"
+                value: "Failed to read file \"%@\": %@",
+                url.lastPathComponent,
+                error.localizedDescription
             )
 
         case .fileWriteFailed(let url, let error):
-            return NSLocalizedString(
+            return L10n.format(
                 "error.fileWriteFailed",
-                value: "Failed to write file \"\(url.lastPathComponent)\": \(error.localizedDescription)",
-                comment: "Error when writing a file fails"
+                value: "Failed to write file \"%@\": %@",
+                url.lastPathComponent,
+                error.localizedDescription
             )
 
         case .jsonFormatError(let line, let column, let message):
-            return NSLocalizedString(
+            return L10n.format(
                 "error.jsonFormatError",
-                value: "JSON format error at line \(line), column \(column): \(message)",
-                comment: "Error when JSON formatting fails"
+                value: "JSON format error at line %d, column %d: %@",
+                line,
+                column,
+                message
             )
         }
     }
@@ -61,23 +65,11 @@ enum AppError: LocalizedError {
     var recoverySuggestion: String? {
         switch self {
         case .fileReadFailed:
-            return NSLocalizedString(
-                "error.fileReadFailed.recovery",
-                value: "Check file permissions and try again.",
-                comment: "Recovery suggestion for file read failure"
-            )
+            return L10n.tr("error.fileReadFailed.recovery", value: "Check file permissions and try again.")
         case .fileWriteFailed:
-            return NSLocalizedString(
-                "error.fileWriteFailed.recovery",
-                value: "Check file permissions and available disk space.",
-                comment: "Recovery suggestion for file write failure"
-            )
+            return L10n.tr("error.fileWriteFailed.recovery", value: "Check file permissions and available disk space.")
         case .jsonFormatError:
-            return NSLocalizedString(
-                "error.jsonFormatError.recovery",
-                value: "Fix the JSON syntax error and try formatting again.",
-                comment: "Recovery suggestion for JSON format error"
-            )
+            return L10n.tr("error.jsonFormatError.recovery", value: "Fix the JSON syntax error and try formatting again.")
         }
     }
 }

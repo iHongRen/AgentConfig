@@ -138,7 +138,7 @@ final class CodexProfileViewModel: ObservableObject {
     func addProfile() {
         guard let source = selectedProfile ?? profiles.first else { return }
         let profile = CodexProfile(
-            name: "新配置 \(profiles.count + 1)",
+            name: "\(L10n.tr("profile.newName", value: "New Profile")) \(profiles.count + 1)",
             configText: source.configText,
             authText: source.authText,
             zshrcText: source.zshrcText,
@@ -151,11 +151,11 @@ final class CodexProfileViewModel: ObservableObject {
 
     func deleteProfile(id: UUID) -> Bool {
         guard profiles.count > 1 else {
-            lastErrorMessage = "至少需要保留一个 Codex Profile。"
+            lastErrorMessage = L10n.tr("profile.codex.minCount", value: "At least one Codex Profile must be kept.")
             return false
         }
         guard let index = profiles.firstIndex(where: { $0.id == id }) else {
-            lastErrorMessage = "未找到要删除的 Codex Profile。"
+            lastErrorMessage = L10n.tr("profile.codex.notFound", value: "The Codex Profile to delete could not be found.")
             return false
         }
 

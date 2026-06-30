@@ -73,11 +73,11 @@ struct AgentProfileEditorView: View {
             return Alert(
                 title: Text(confirmation.title),
                 message: Text(confirmation.message),
-                primaryButton: .destructive(Text("删除")) {
+                primaryButton: .destructive(Text(L10n.tr("profile.delete", value: "Delete"))) {
                     guard let profile else { return }
                     showToast(profile.delete().message)
                 },
-                secondaryButton: .cancel(Text("取消"))
+                secondaryButton: .cancel(Text(L10n.tr("profile.cancel", value: "Cancel")))
             )
         }
     }
@@ -88,7 +88,7 @@ struct AgentProfileEditorView: View {
                 isNameFieldFocused = true
             } label: {
                 HStack(spacing: 0) {
-                    TextField("配置名称", text: $editingProfileName)
+                    TextField(L10n.tr("profile.namePlaceholder", value: "Profile Name"), text: $editingProfileName)
                         .textFieldStyle(.plain)
                         .font(.system(size: 13, weight: .semibold))
                         .focused($isNameFieldFocused)
@@ -147,14 +147,14 @@ struct AgentProfileEditorView: View {
             .buttonStyle(.plain)
             .disabled(!profile.canDelete)
             .opacity(profile.canDelete ? 1 : 0.45)
-            .help("删除当前配置")
+            .help(L10n.tr("profile.deleteCurrent", value: "Delete current profile"))
 
             Button {
                 Task {
                     showToast((await profile.apply()).message)
                 }
             } label: {
-                Label("应用", systemImage: "checkmark.circle")
+                Label(L10n.tr("profile.apply", value: "Apply"), systemImage: "checkmark.circle")
                     .labelStyle(.titleAndIcon)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
@@ -166,7 +166,7 @@ struct AgentProfileEditorView: View {
                     .contentShape(RoundedRectangle(cornerRadius: 10))
             }
             .buttonStyle(.plain)
-            .help("应用当前配置")
+            .help(L10n.tr("profile.applyCurrent", value: "Apply current profile"))
         }
         .padding(.horizontal, 12)
         .frame(height: 48)
@@ -213,7 +213,7 @@ struct AgentProfileEditorView: View {
                             .fill(field.accentColor.opacity(0.16))
                     )
 
-                Text("\(lineCount(in: field.text.wrappedValue)) 行")
+                Text(L10n.format("profile.lineCount", value: "%d lines", lineCount(in: field.text.wrappedValue)))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
@@ -224,16 +224,16 @@ struct AgentProfileEditorView: View {
 
                 Spacer(minLength: 8)
 
-                Button("复制") {
+                Button(L10n.tr("profile.copy", value: "Copy")) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(field.text.wrappedValue, forType: .string)
-                    showToast("已复制当前配置片段")
+                    showToast(L10n.tr("profile.copyToast", value: "Copied current configuration snippet"))
                 }
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Color(red: 0.6, green: 0.6, blue: 0.6))
                 .frame(height: 24)
                 .buttonStyle(.plain)
-                .help("复制")
+                .help(L10n.tr("profile.copyHelp", value: "Copy"))
             }
             .padding(.horizontal, 12)
             .frame(height: 32)
@@ -285,7 +285,7 @@ struct AgentProfileEditorView: View {
             Image(systemName: "rectangle.stack")
                 .font(.system(size: 42))
                 .foregroundStyle(.tertiary)
-            Text("选择左侧配置")
+            Text(L10n.tr("profile.empty", value: "Select a profile"))
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
@@ -319,7 +319,7 @@ struct AgentProfileEditorView: View {
     }
 
     private func profileNameFieldWidth(for name: String) -> CGFloat {
-        let displayText = name.isEmpty ? "配置名称" : name
+        let displayText = name.isEmpty ? L10n.tr("profile.namePlaceholder", value: "Profile Name") : name
         let font = NSFont.systemFont(ofSize: 13, weight: .semibold)
         let measuredWidth = ceil((displayText as NSString).size(withAttributes: [.font: font]).width)
         return min(max(measuredWidth + 10, 50), 240)

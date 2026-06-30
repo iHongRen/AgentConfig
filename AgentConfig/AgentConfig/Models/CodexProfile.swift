@@ -74,7 +74,7 @@ struct CodexProfile: Identifiable, Codable, Equatable {
 
         return [
             CodexProfile(
-                name: "新配置",
+                name: L10n.tr("profile.newName", value: "New Profile"),
                 configText: config,
                 authText: auth,
                 zshrcText: zshrc,

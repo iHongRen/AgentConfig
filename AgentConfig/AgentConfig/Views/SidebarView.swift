@@ -58,30 +58,30 @@ struct SidebarView: View {
             switch target {
             case .hideFile(let url):
                 return Alert(
-                    title: Text("从列表移除？"),
-                    message: Text("将从侧边栏移除此文件，但不会删除实际文件。\n\(url.path)"),
-                    primaryButton: .default(Text("移除")) {
+                    title: Text(L10n.tr("sidebar.removeFromListTitle", value: "Remove from list?")),
+                    message: Text(L10n.format("sidebar.removeFromListMessage", value: "This removes the file from the sidebar but does not delete the file.\n%@", url.path)),
+                    primaryButton: .default(Text(L10n.tr("sidebar.remove", value: "Remove"))) {
                         appViewModel.hideFile(url)
                     },
-                    secondaryButton: .cancel(Text("取消"))
+                    secondaryButton: .cancel(Text(L10n.tr("profile.cancel", value: "Cancel")))
                 )
             case .deleteCodexProfile(let profile):
                 return Alert(
-                    title: Text("删除 Codex Profile？"),
-                    message: Text("将删除“\(profile.name.isEmpty ? "未命名配置" : profile.name)”。此操作不会修改已经写入磁盘的 Codex 配置文件。"),
-                    primaryButton: .destructive(Text("删除")) {
+                    title: Text(L10n.tr("sidebar.deleteCodexProfileTitle", value: "Delete Codex Profile?")),
+                    message: Text(L10n.format("sidebar.deleteCodexProfileMessage", value: "“%@” will be deleted. This will not modify any Codex config files already written to disk.", profile.name.isEmpty ? L10n.tr("profile.defaultName", value: "Untitled Profile") : profile.name)),
+                    primaryButton: .destructive(Text(L10n.tr("profile.delete", value: "Delete"))) {
                         _ = codexProfileViewModel.deleteProfile(id: profile.id)
                     },
-                    secondaryButton: .cancel(Text("取消"))
+                    secondaryButton: .cancel(Text(L10n.tr("profile.cancel", value: "Cancel")))
                 )
             case .deleteClaudeProfile(let profile):
                 return Alert(
-                    title: Text("删除 Claude Profile？"),
-                    message: Text("将删除“\(profile.name.isEmpty ? "未命名配置" : profile.name)”。此操作不会修改已经写入磁盘的 Claude 配置文件。"),
-                    primaryButton: .destructive(Text("删除")) {
+                    title: Text(L10n.tr("sidebar.deleteClaudeProfileTitle", value: "Delete Claude Profile?")),
+                    message: Text(L10n.format("sidebar.deleteClaudeProfileMessage", value: "“%@” will be deleted. This will not modify any Claude config files already written to disk.", profile.name.isEmpty ? L10n.tr("profile.defaultName", value: "Untitled Profile") : profile.name)),
+                    primaryButton: .destructive(Text(L10n.tr("profile.delete", value: "Delete"))) {
                         _ = claudeProfileViewModel.deleteProfile(id: profile.id)
                     },
-                    secondaryButton: .cancel(Text("取消"))
+                    secondaryButton: .cancel(Text(L10n.tr("profile.cancel", value: "Cancel")))
                 )
             }
         }
@@ -104,7 +104,7 @@ struct SidebarView: View {
 
     private func envSection(_ category: EnvCategory) -> some View {
         SidebarDisclosureSection(
-            title: "环境变量",
+            title: L10n.tr("sidebar.environment", value: "Environment"),
             icon: .systemName("terminal.fill"),
             iconColor: Color(red: 0.22, green: 0.78, blue: 0.20),
             isExpanded: $isEnvExpanded
@@ -113,13 +113,13 @@ struct SidebarView: View {
                 fileRow(file)
             }
         } contextMenu: {
-            Button("添加文件") {
+            Button(L10n.tr("sidebar.addFile", value: "Add File")) {
                 openFilePicker(for: .env, directoryURL: preferredDirectory(for: category))
             }
 
             Divider()
 
-            Button("在 Finder 中打开") {
+            Button(L10n.tr("sidebar.openInFinder", value: "Open in Finder")) {
                 let home = FileManager.default.homeDirectoryForCurrentUser
                 NSWorkspace.shared.activateFileViewerSelecting([home])
             }
@@ -140,12 +140,12 @@ struct SidebarView: View {
             ) {
                 if category.id == "claude" {
                     claudeProfileSection
-                    sidebarSubheading("Files")
+                    sidebarSubheading(L10n.tr("sidebar.filesSection", value: "Files"))
                 }
 
                 if category.id == "codex" {
                     codexProfileSection
-                    sidebarSubheading("Files")
+                    sidebarSubheading(L10n.tr("sidebar.filesSection", value: "Files"))
                 }
 
                 ForEach(category.files) { file in
@@ -156,13 +156,13 @@ struct SidebarView: View {
                     missingFileRow(missingURL)
                 }
             } contextMenu: {
-                Button("添加文件") {
+                Button(L10n.tr("sidebar.addFile", value: "Add File")) {
                     openFilePicker(for: .agent(id: category.id), directoryURL: preferredDirectory(for: category))
                 }
 
                 Divider()
 
-                Button("在 Finder 中打开") {
+                Button(L10n.tr("sidebar.openInFinder", value: "Open in Finder")) {
                     let representativeURL = category.files.first?.url ?? category.missingPaths.first
                     if let url = representativeURL {
                         NSWorkspace.shared.activateFileViewerSelecting([url])
@@ -180,7 +180,7 @@ struct SidebarView: View {
     private var codexProfileSection: some View {
         VStack(alignment: .leading, spacing: 1) {
             HStack {
-                sidebarSubheading("Profiles")
+                sidebarSubheading(L10n.tr("sidebar.profilesSection", value: "Profiles"))
 
                 Spacer()
 
@@ -197,7 +197,7 @@ struct SidebarView: View {
                         .frame(width: 20, height: 20)
                 }
                 .buttonStyle(.plain)
-                .help("新增 Codex Profile")
+                .help(L10n.tr("sidebar.newCodexProfile", value: "New Codex Profile"))
                 .padding(.trailing, 4)
 
             }
@@ -211,7 +211,7 @@ struct SidebarView: View {
     private var claudeProfileSection: some View {
         VStack(alignment: .leading, spacing: 1) {
             HStack {
-                sidebarSubheading("Profiles")
+                sidebarSubheading(L10n.tr("sidebar.profilesSection", value: "Profiles"))
 
                 Spacer()
 
@@ -229,7 +229,7 @@ struct SidebarView: View {
                         .frame(width: 20, height: 20)
                 }
                 .buttonStyle(.plain)
-                .help("新增 Claude Profile")
+                .help(L10n.tr("sidebar.newClaudeProfile", value: "New Claude Profile"))
                 .padding(.trailing, 4)
             }
 
@@ -267,7 +267,7 @@ struct SidebarView: View {
                     .frame(width: 18)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(profile.name.isEmpty ? "未命名配置" : profile.name)
+                    Text(profile.name.isEmpty ? L10n.tr("profile.defaultName", value: "Untitled Profile") : profile.name)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
@@ -296,7 +296,7 @@ struct SidebarView: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            Button("删除 Profile") {
+            Button(L10n.tr("sidebar.deleteProfile", value: "Delete Profile")) {
                 deleteTarget = .deleteCodexProfile(profile)
             }
             .disabled(codexProfileViewModel.profiles.count <= 1)
@@ -321,7 +321,7 @@ struct SidebarView: View {
                     .frame(width: 18)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(profile.name.isEmpty ? "未命名配置" : profile.name)
+                    Text(profile.name.isEmpty ? L10n.tr("profile.defaultName", value: "Untitled Profile") : profile.name)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
@@ -350,7 +350,7 @@ struct SidebarView: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            Button("删除 Profile") {
+            Button(L10n.tr("sidebar.deleteProfile", value: "Delete Profile")) {
                 deleteTarget = .deleteClaudeProfile(profile)
             }
             .disabled(claudeProfileViewModel.profiles.count <= 1)
@@ -412,11 +412,11 @@ struct SidebarView: View {
 
     @ViewBuilder
     private func fileContextMenu(for file: ConfigFile) -> some View {
-        Button("在 Finder 中打开") {
+        Button(L10n.tr("sidebar.openInFinder", value: "Open in Finder")) {
             NSWorkspace.shared.activateFileViewerSelecting([file.url])
         }
 
-        Button("在 VSCode 中打开") {
+        Button(L10n.tr("sidebar.openInVSCode", value: "Open in VSCode")) {
             let task = Process()
             task.launchPath = "/usr/local/bin/code"
             task.arguments = [file.url.path]
@@ -425,22 +425,22 @@ struct SidebarView: View {
 
         Divider()
 
-        Button("复制路径") {
+        Button(L10n.tr("sidebar.copyPath", value: "Copy Path")) {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(file.url.path, forType: .string)
         }
 
         Divider()
 
-        Button("从列表移除") {
+        Button(L10n.tr("sidebar.remove", value: "Remove")) {
             deleteTarget = .hideFile(file.url)
         }
     }
 
     private func profileStatusText(_ profile: CodexProfile) -> String {
-        if profile.isDirty { return "未应用" }
-        if profile.isActive { return "已应用" }
-        return "草稿"
+        if profile.isDirty { return L10n.tr("sidebar.unapplied", value: "Unapplied") }
+        if profile.isActive { return L10n.tr("sidebar.applied", value: "Applied") }
+        return L10n.tr("sidebar.draft", value: "Draft")
     }
 
     private func profileStateColor(_ profile: CodexProfile) -> Color {
@@ -450,9 +450,9 @@ struct SidebarView: View {
     }
 
     private func claudeProfileStatusText(_ profile: ClaudeProfile) -> String {
-        if profile.isDirty { return "未应用" }
-        if profile.isActive { return "已应用" }
-        return "草稿"
+        if profile.isDirty { return L10n.tr("sidebar.unapplied", value: "Unapplied") }
+        if profile.isActive { return L10n.tr("sidebar.applied", value: "Applied") }
+        return L10n.tr("sidebar.draft", value: "Draft")
     }
 
     private func claudeProfileStateColor(_ profile: ClaudeProfile) -> Color {
@@ -476,7 +476,7 @@ struct SidebarView: View {
 
             Spacer(minLength: 4)
 
-            Button("创建") {
+            Button(L10n.tr("sidebar.create", value: "Create")) {
                 createFile(at: url)
             }
             .buttonStyle(.bordered)
@@ -486,7 +486,7 @@ struct SidebarView: View {
         .padding(.trailing, 8)
         .padding(.vertical, 5)
         .contextMenu {
-            Button("复制路径") {
+            Button(L10n.tr("sidebar.copyPath", value: "Copy Path")) {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(url.path, forType: .string)
             }
@@ -582,8 +582,8 @@ struct SidebarView: View {
 
     private func openFilePicker(for categoryKey: SidebarCategoryKey, directoryURL: URL?) {
         let panel = NSOpenPanel()
-        panel.title = "添加文件"
-        panel.message = "选择要添加到此分类的文件"
+        panel.title = L10n.tr("sidebar.addFilePanel.title", value: "Add File")
+        panel.message = L10n.tr("sidebar.addFilePanel.message", value: "Choose files to add to this category")
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = true

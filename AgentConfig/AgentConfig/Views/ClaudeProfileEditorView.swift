@@ -23,15 +23,15 @@ struct ClaudeProfileEditorView: View {
             status: profileStatus(for: profile),
             canDelete: viewModel.profiles.count > 1,
             deleteConfirmation: AgentProfileEditorDeleteConfirmation(
-                title: "删除 Claude Profile？",
-                message: "将删除“\(displayName(for: profile.name))”。此操作不会修改已经写入磁盘的 Claude 配置文件。"
+                title: L10n.tr("claude.deleteConfirmation.title", value: "Delete Claude Profile?"),
+                message: L10n.format("claude.deleteConfirmation.message", value: "“%@” will be deleted. This will not modify any Claude config files already written to disk.", displayName(for: profile.name))
             ),
             fields: [
                 AgentProfileEditorField(
                     id: "settings",
                     title: "~/.claude/settings.json",
                     language: "JSON",
-                    helpText: "Claude 的主配置文件。应用时会整体写入磁盘上的 ~/.claude/settings.json。",
+                    helpText: L10n.tr("claude.field.settings.help", value: "Claude main config file. Applying writes the full contents to ~/.claude/settings.json."),
                     fileType: .json,
                     accentColor: Color(red: 0.18, green: 0.64, blue: 0.42),
                     defaultHeight: 220,
@@ -46,7 +46,7 @@ struct ClaudeProfileEditorView: View {
                     id: "claude-json",
                     title: "~/.claude.json",
                     language: "JSON",
-                    helpText: "默认展示 hasCompletedOnboarding，可自由编辑其他字段。应用时会与当前 ~/.claude.json 做深度合并，而不是直接整文件覆盖。",
+                    helpText: L10n.tr("claude.field.state.help", value: "Shows hasCompletedOnboarding by default. You can freely edit other fields. Applying deep-merges into the current ~/.claude.json instead of replacing the whole file."),
                     fileType: .json,
                     accentColor: Color(red: 0.18, green: 0.64, blue: 0.42),
                     defaultHeight: 220,
@@ -61,7 +61,7 @@ struct ClaudeProfileEditorView: View {
                     id: "zshrc",
                     title: "~/.zshrc",
                     language: "Shell",
-                    helpText: "仅管理 AgentConfig Claude Profile 标记块，不会覆盖整个 ~/.zshrc。",
+                    helpText: L10n.tr("claude.field.zshrc.help", value: "Only manages the AgentConfig Claude Profile block and will not overwrite the full ~/.zshrc."),
                     fileType: .shell,
                     accentColor: Color(red: 0.46, green: 0.40, blue: 0.90),
                     defaultHeight: 150,
@@ -76,31 +76,31 @@ struct ClaudeProfileEditorView: View {
             updateName: { viewModel.updateSelected(name: $0) },
             delete: {
                 if viewModel.deleteProfile(id: profile.id) {
-                    return .success("已删除配置")
+                    return .success(L10n.tr("profile.deleted", value: "Profile deleted"))
                 }
-                return .failure(viewModel.lastErrorMessage ?? "删除失败")
+                return .failure(viewModel.lastErrorMessage ?? L10n.tr("profile.deleteFailed", value: "Delete failed"))
             },
             apply: {
                 let success = await viewModel.applySelected()
                 if success {
-                    return .success("已应用配置")
+                    return .success(L10n.tr("profile.applied", value: "Profile applied"))
                 }
-                return .failure(viewModel.lastErrorMessage ?? "应用失败")
+                return .failure(viewModel.lastErrorMessage ?? L10n.tr("profile.applyFailed", value: "Apply failed"))
             }
         )
     }
 
     private func profileStatus(for profile: ClaudeProfile) -> AgentProfileEditorStatus {
         if profile.isDirty {
-            return AgentProfileEditorStatus(text: "未应用修改", color: .orange)
+            return AgentProfileEditorStatus(text: L10n.tr("profile.status.modified", value: "Unapplied Changes"), color: .orange)
         }
         if profile.isActive {
-            return AgentProfileEditorStatus(text: "当前生效", color: .green)
+            return AgentProfileEditorStatus(text: L10n.tr("profile.status.active", value: "Active"), color: .green)
         }
-        return AgentProfileEditorStatus(text: "可应用", color: .secondary)
+        return AgentProfileEditorStatus(text: L10n.tr("profile.status.ready", value: "Ready to Apply"), color: .secondary)
     }
 
     private func displayName(for name: String) -> String {
-        name.isEmpty ? "未命名配置" : name
+        name.isEmpty ? L10n.tr("profile.defaultName", value: "Untitled Profile") : name
     }
 }

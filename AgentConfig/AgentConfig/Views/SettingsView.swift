@@ -11,7 +11,7 @@ import SwiftUI
 ///
 /// 提供以下设置项：
 /// - 外观模式：浅色 / 深色 / 跟随系统
-/// - 界面语言：English / 简体中文 / 跟随系统
+/// - 界面语言：English / 简体中文
 ///
 /// 每次设置变更后立即调用 `AppViewModel.updateSettings(_:)` 持久化。
 struct SettingsView: View {
@@ -20,14 +20,14 @@ struct SettingsView: View {
 
     // 本地副本，用于绑定 Picker / Toggle，变更时同步到 ViewModel
     @State private var appearanceMode: AppearanceMode = .system
-    @State private var language: AppLanguage = .system
+    @State private var language: AppLanguage = L10n.automaticLanguage
 
     var body: some View {
         Form {
             // MARK: - 外观
             Section {
                 Picker(
-                    NSLocalizedString("settings.appearance", value: "Appearance", comment: "Appearance setting label"),
+                    L10n.tr("settings.appearance", value: "Appearance"),
                     selection: $appearanceMode
                 ) {
                     ForEach(AppearanceMode.allCases, id: \.self) { mode in
@@ -42,7 +42,7 @@ struct SettingsView: View {
             // MARK: - 语言
             Section {
                 Picker(
-                    NSLocalizedString("settings.language", value: "Language", comment: "Language setting label"),
+                    L10n.tr("settings.language", value: "Language"),
                     selection: $language
                 ) {
                     ForEach(AppLanguage.allCases, id: \.self) { lang in
@@ -64,7 +64,7 @@ struct SettingsView: View {
             language = appViewModel.settings.language
         }
         .navigationTitle(
-            NSLocalizedString("settings.title", value: "Settings", comment: "Settings window title")
+            L10n.tr("settings.title", value: "Settings")
         )
     }
 

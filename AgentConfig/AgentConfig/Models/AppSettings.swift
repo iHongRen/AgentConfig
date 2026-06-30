@@ -67,11 +67,11 @@ enum AppearanceMode: String, Codable, CaseIterable {
     var displayName: String {
         switch self {
         case .light:
-            return NSLocalizedString("appearance.light", value: "Light", comment: "Light appearance mode")
+            return L10n.tr("appearance.light", value: "Light")
         case .dark:
-            return NSLocalizedString("appearance.dark", value: "Dark", comment: "Dark appearance mode")
+            return L10n.tr("appearance.dark", value: "Dark")
         case .system:
-            return NSLocalizedString("appearance.system", value: "System", comment: "System appearance mode")
+            return L10n.tr("appearance.system", value: "System")
         }
     }
 }
@@ -82,7 +82,31 @@ enum AppearanceMode: String, Codable, CaseIterable {
 enum AppLanguage: String, Codable, CaseIterable {
     case en
     case zhHans = "zh-Hans"
-    case system
+
+    static var allCases: [AppLanguage] {
+        [.en, .zhHans]
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = (try? container.decode(String.self)) ?? ""
+
+        switch rawValue.lowercased() {
+        case "zh-hans", "zh_cn", "zh-cn", "zh":
+            self = .zhHans
+        case "system":
+            self = L10n.automaticLanguage
+        case "en", "en-us", "en-gb", "":
+            self = .en
+        default:
+            self = .en
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 
     var displayName: String {
         switch self {
@@ -90,8 +114,6 @@ enum AppLanguage: String, Codable, CaseIterable {
             return "English"
         case .zhHans:
             return "简体中文"
-        case .system:
-            return NSLocalizedString("language.system", value: "System", comment: "System language setting")
         }
     }
 }
@@ -104,7 +126,7 @@ struct AppSettings: Codable {
     var appearanceMode: AppearanceMode = .system
 
     /// 界面语言
-    var language: AppLanguage = .system
+    var language: AppLanguage = L10n.automaticLanguage
 
     /// 用户手动添加的自定义配置文件路径
     var customPaths: [URL] = []
@@ -132,7 +154,7 @@ struct AppSettings: Codable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         appearanceMode = try container.decodeIfPresent(AppearanceMode.self, forKey: .appearanceMode) ?? .system
-        language = try container.decodeIfPresent(AppLanguage.self, forKey: .language) ?? .system
+        language = try container.decodeIfPresent(AppLanguage.self, forKey: .language) ?? L10n.automaticLanguage
         customPaths = try container.decodeIfPresent([URL].self, forKey: .customPaths) ?? []
         hiddenFilePaths = try container.decodeIfPresent([URL].self, forKey: .hiddenFilePaths) ?? []
         categoryFilePaths = try container.decodeIfPresent([String: [URL]].self, forKey: .categoryFilePaths) ?? [:]

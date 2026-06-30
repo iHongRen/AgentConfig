@@ -39,7 +39,7 @@ final class AboutWindowController: NSWindowController, NSWindowDelegate {
             defer: false
         )
 
-        window.title = NSLocalizedString("menu.about", value: "About AgentConfig", comment: "About window title")
+        window.title = L10n.tr("menu.about", value: "About AgentConfig")
         window.center()
         window.contentView = hostingView
         window.isReleasedWhenClosed = false
@@ -117,6 +117,7 @@ struct AgentConfigApp: App {
             }
             .onReceive(NotificationCenter.default.publisher(for: .languageDidChange)) { _ in
                 languageChangeID += 1
+                aboutWindowController?.window?.title = L10n.tr("menu.about", value: "About AgentConfig")
             }
             .onChange(of: appViewModel.settings.appearanceMode) { _, newMode in
                 applyAppearance(newMode)
@@ -126,20 +127,20 @@ struct AgentConfigApp: App {
         .commands {
             // MARK: About Menu
             CommandGroup(replacing: .appInfo) {
-                Button(NSLocalizedString("menu.about", value: "About AgentConfig", comment: "About menu item")) {
+                Button(L10n.tr("menu.about", value: "About AgentConfig")) {
                     showAboutWindow()
                 }
             }
             // MARK: Save Menu
             CommandGroup(replacing: .saveItem) {
-                Button("保存") {
+                Button(L10n.tr("menu.save", value: "Save")) {
                     saveCoordinator.save()
                 }
                 .keyboardShortcut("s", modifiers: .command)
             }
             // MARK: Find Menu
             CommandGroup(replacing: .newItem) {
-                Button("查找") {
+                Button(L10n.tr("menu.find", value: "Find")) {
                     saveCoordinator.toggleSearch()
                 }
                 .keyboardShortcut("f", modifiers: .command)

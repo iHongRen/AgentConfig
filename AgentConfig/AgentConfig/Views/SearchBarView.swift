@@ -32,7 +32,7 @@ struct SearchBarView: View {
 
     private var matchCountText: String {
         guard !viewModel.searchQuery.isEmpty else { return "" }
-        guard !viewModel.searchResults.isEmpty else { return "无结果" }
+        guard !viewModel.searchResults.isEmpty else { return L10n.tr("search.noResults", value: "No Results") }
         return "\(viewModel.currentSearchIndex + 1)/\(viewModel.searchResults.count)"
     }
 
@@ -68,7 +68,7 @@ struct SearchBarView: View {
                     .foregroundStyle(.secondary)
                     .frame(width: 30)
 
-                TextField("搜索", text: $viewModel.searchQuery)
+                TextField(L10n.tr("search.placeholder", value: "Search"), text: $viewModel.searchQuery)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
                     .focused($isSearchFieldFocused)
@@ -125,7 +125,7 @@ struct SearchBarView: View {
                 icon: "textformat",
                 label: "Aa",
                 isOn: $viewModel.isCaseSensitive,
-                tooltip: "区分大小写 (⌥⌘C)"
+                tooltip: L10n.tr("search.caseSensitive", value: "Match Case (⌥⌘C)")
             )
             .onChange(of: viewModel.isCaseSensitive) { _, v in
                 viewModel.search(query: viewModel.searchQuery, caseSensitive: v)
@@ -135,7 +135,7 @@ struct SearchBarView: View {
                 icon: "chevron.left.forwardslash.chevron.right",
                 label: ".*",
                 isOn: .constant(false),
-                tooltip: "使用正则表达式（暂不支持）",
+                tooltip: L10n.tr("search.regexDisabled", value: "Use Regular Expression (Not Yet Supported)"),
                 disabled: true
             )
 
@@ -143,11 +143,11 @@ struct SearchBarView: View {
 
             // ── 导航按钮 ────────────────────────────────────────────
             HStack(spacing: 2) {
-                navButton(icon: "chevron.up", action: { viewModel.previousMatch() }, tooltip: "上一个 (⇧F3)")
+                navButton(icon: "chevron.up", action: { viewModel.previousMatch() }, tooltip: L10n.tr("search.previous", value: "Previous (⇧F3)"))
                     .disabled(viewModel.searchResults.isEmpty)
                     .keyboardShortcut("g", modifiers: [.command, .shift])
 
-                navButton(icon: "chevron.down", action: { viewModel.nextMatch() }, tooltip: "下一个 (F3)")
+                navButton(icon: "chevron.down", action: { viewModel.nextMatch() }, tooltip: L10n.tr("search.next", value: "Next (F3)"))
                     .disabled(viewModel.searchResults.isEmpty)
                     .keyboardShortcut("g", modifiers: .command)
             }
@@ -161,7 +161,7 @@ struct SearchBarView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("关闭 (Esc)")
+            .help(L10n.tr("search.close", value: "Close (Esc)"))
         }
         .padding(.horizontal, outerHorizontalPadding)
         .frame(height: outerHeight)

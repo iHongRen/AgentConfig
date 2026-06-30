@@ -444,7 +444,7 @@ struct AgentProfileCodeEditor: NSViewRepresentable {
     }
 
     private var editorBackgroundColor: NSColor {
-        isDarkMode ? NSColor(white: 0.12, alpha: 1) : NSColor(white: 0.985, alpha: 1)
+        NSColor.textBackgroundColor
     }
 
     private var editorTextColor: NSColor {

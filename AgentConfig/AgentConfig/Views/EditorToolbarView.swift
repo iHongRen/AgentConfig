@@ -115,7 +115,7 @@ struct EditorToolbarView: View {
         toolbarIconButton(systemName: "magnifyingglass", isActive: isSearchBarVisible) {
             onShowSearch?()
         }
-        .help("搜索")
+        .help(L10n.tr("toolbar.search", value: "Search"))
     }
 
     private func toolbarIconButton(systemName: String, isActive: Bool, action: @escaping () -> Void) -> some View {
@@ -141,7 +141,7 @@ struct EditorToolbarView: View {
         toolbarIconButton(systemName: "text.alignleft", isActive: false) {
             performFormat()
         }
-        .help(NSLocalizedString("toolbar.format.help", value: "将 JSON 内容格式化为 4 空格缩进", comment: "Format button tooltip"))
+        .help(L10n.tr("toolbar.format.help", value: "Format JSON with 4-space indentation"))
     }
 
     /// 格式化错误横幅（内联显示错误行列位置）
@@ -170,7 +170,7 @@ struct EditorToolbarView: View {
                     .foregroundColor(.secondary)
             }
             .buttonStyle(.plain)
-            .help(NSLocalizedString("toolbar.dismissError", value: "关闭错误提示", comment: "Dismiss error button tooltip"))
+            .help(L10n.tr("toolbar.dismissError", value: "Dismiss error"))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -183,7 +183,7 @@ struct EditorToolbarView: View {
     /// 当前文件名，无文件时显示占位符
     private var currentFileName: String {
         editorViewModel.currentFile?.url.lastPathComponent
-            ?? NSLocalizedString("toolbar.noFile", value: "未打开文件", comment: "Placeholder when no file is open")
+            ?? L10n.tr("toolbar.noFile", value: "No file open")
     }
 
     /// 当前文件是否为 JSON 系列类型
@@ -230,19 +230,19 @@ private struct FormatErrorInfo: Equatable {
     /// 用于 UI 展示的格式化错误描述
     var displayMessage: String {
         if line > 0 {
-            let template = NSLocalizedString(
+            return L10n.format(
                 "toolbar.formatError.withLocation",
-                value: "JSON 格式错误（第 %d 行，第 %d 列）：%@",
-                comment: "JSON format error with line and column info"
+                value: "JSON format error (line %d, column %d): %@",
+                line,
+                column,
+                message
             )
-            return String(format: template, line, column, message)
         } else {
-            let template = NSLocalizedString(
+            return L10n.format(
                 "toolbar.formatError.generic",
-                value: "JSON 格式错误：%@",
-                comment: "Generic JSON format error"
+                value: "JSON format error: %@",
+                message
             )
-            return String(format: template, message)
         }
     }
 }
