@@ -47,9 +47,9 @@ enum FileType: Equatable {
         case .toml:
             return "TOML"
         case .shell:
-            return "Shell Script"
+            return "Shell"
         case .plainText:
-            return "Plain Text"
+            return "Plain"
         }
     }
 

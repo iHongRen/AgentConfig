@@ -149,7 +149,7 @@ struct AgentConfigApp: App {
     /// 显示关于窗口
     private func showAboutWindow() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 560, height: 620),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 390),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
