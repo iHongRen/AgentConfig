@@ -9,7 +9,14 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
+private let sidebarReorderAnimation = Animation.spring(response: 0.24, dampingFraction: 0.82, blendDuration: 0.12)
+private let sidebarDragLiftAnimation = Animation.spring(response: 0.18, dampingFraction: 0.86, blendDuration: 0.08)
+
 struct SidebarView: View {
+
+    private enum CoordinateSpace {
+        static let sidebar = "sidebar-content"
+    }
 
     @EnvironmentObject var appViewModel: AppViewModel
     @ObservedObject var codexProfileViewModel: CodexProfileViewModel
@@ -19,6 +26,10 @@ struct SidebarView: View {
     @State private var expandedAgentIDs: Set<String> = []
     @State private var targetedDropCategoryKey: String?
     @State private var deleteTarget: DeleteTarget?
+    @State private var itemFrames: [String: CGRect] = [:]
+    @State private var activeAgentDragID: String?
+    @State private var activeCodexProfileDragID: UUID?
+    @State private var activeClaudeProfileDragID: UUID?
 
     enum DeleteTarget: Identifiable {
         case hideFile(URL)
@@ -50,6 +61,7 @@ struct SidebarView: View {
                 .padding(.horizontal, 10)
                 .padding(.top, 18)
                 .padding(.bottom, 16)
+                .coordinateSpace(name: CoordinateSpace.sidebar)
             }
         }
         .background(Color.agentSidebarBackground)
@@ -131,50 +143,69 @@ struct SidebarView: View {
     }
 
     private var agentSections: some View {
-        ForEach(appViewModel.agentCategories) { category in
-            SidebarDisclosureSection(
-                title: category.displayName,
-                icon: .assetName(category.iconName),
-                iconColor: category.iconColor,
-                isExpanded: bindingForAgent(category.id)
-            ) {
-                if category.id == "claude" {
-                    claudeProfileSection
-                    sidebarSubheading(L10n.tr("sidebar.filesSection", value: "Files"))
-                }
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(appViewModel.agentCategories) { category in
+                SidebarDisclosureSection(
+                    title: category.displayName,
+                    icon: .assetName(category.iconName),
+                    iconColor: category.iconColor,
+                    isExpanded: bindingForAgent(category.id),
+                    isDragging: activeAgentDragID == category.id,
+                    dragGestureBuilder: {
+                        AnyView(
+                            SidebarDisclosureSectionHeader(
+                                title: category.displayName,
+                                icon: .assetName(category.iconName),
+                                iconColor: category.iconColor,
+                                isExpanded: bindingForAgent(category.id),
+                                contextMenu: {
+                                    Button(L10n.tr("sidebar.addFile", value: "Add File")) {
+                                        openFilePicker(for: .agent(id: category.id), directoryURL: preferredDirectory(for: category))
+                                    }
 
-                if category.id == "codex" {
-                    codexProfileSection
-                    sidebarSubheading(L10n.tr("sidebar.filesSection", value: "Files"))
-                }
+                                    Divider()
 
-                ForEach(category.files) { file in
-                    fileRow(file)
-                }
-
-                ForEach(category.missingPaths, id: \.absoluteString) { missingURL in
-                    missingFileRow(missingURL)
-                }
-            } contextMenu: {
-                Button(L10n.tr("sidebar.addFile", value: "Add File")) {
-                    openFilePicker(for: .agent(id: category.id), directoryURL: preferredDirectory(for: category))
-                }
-
-                Divider()
-
-                Button(L10n.tr("sidebar.openInFinder", value: "Open in Finder")) {
-                    let representativeURL = finderTargetURL(for: category)
-                    if let url = representativeURL {
-                        NSWorkspace.shared.activateFileViewerSelecting([url])
+                                    Button(L10n.tr("sidebar.openInFinder", value: "Open in Finder")) {
+                                        let representativeURL = finderTargetURL(for: category)
+                                        if let url = representativeURL {
+                                            NSWorkspace.shared.activateFileViewerSelecting([url])
+                                        }
+                                    }
+                                    .disabled(category.files.isEmpty && category.missingPaths.isEmpty)
+                                }
+                            )
+                            .simultaneousGesture(dragGestureForAgent(category.id))
+                        )
                     }
+                ) {
+                    if category.id == "claude" {
+                        claudeProfileSection
+                        sidebarSubheading(L10n.tr("sidebar.filesSection", value: "Files"))
+                    }
+
+                    if category.id == "codex" {
+                        codexProfileSection
+                        sidebarSubheading(L10n.tr("sidebar.filesSection", value: "Files"))
+                    }
+
+                    ForEach(category.files) { file in
+                        fileRow(file)
+                    }
+
+                    ForEach(category.missingPaths, id: \.absoluteString) { missingURL in
+                        missingFileRow(missingURL)
+                    }
+                } contextMenu: { EmptyView() }
+                .trackFrame(id: frameKeyForAgent(category.id), in: CoordinateSpace.sidebar) { frame in
+                    itemFrames[frameKeyForAgent(category.id)] = frame
                 }
-                .disabled(category.files.isEmpty && category.missingPaths.isEmpty)
-            }
-            .dropTargetStyle(isTargeted: targetedDropCategoryKey == SidebarCategoryKey.agent(id: category.id).storageKey)
-            .onDrop(of: [UTType.fileURL.identifier], isTargeted: dropTargetBinding(for: .agent(id: category.id))) { providers in
-                addDroppedFiles(from: providers, to: .agent(id: category.id))
+                .dropTargetStyle(isTargeted: targetedDropCategoryKey == SidebarCategoryKey.agent(id: category.id).storageKey)
+                .onDrop(of: [UTType.fileURL.identifier], isTargeted: dropTargetBinding(for: .agent(id: category.id))) { providers in
+                    addDroppedFiles(from: providers, to: .agent(id: category.id))
+                }
             }
         }
+        .animation(sidebarReorderAnimation, value: appViewModel.agentCategories.map(\.id))
     }
 
     private var codexProfileSection: some View {
@@ -204,6 +235,10 @@ struct SidebarView: View {
             
             ForEach(codexProfileViewModel.profiles) { profile in
                 codexProfileRow(profile)
+                    .trackFrame(id: frameKeyForCodexProfile(profile.id), in: CoordinateSpace.sidebar) { frame in
+                        itemFrames[frameKeyForCodexProfile(profile.id)] = frame
+                    }
+                    .simultaneousGesture(dragGestureForCodexProfile(profile.id))
             }
         }
     }
@@ -234,6 +269,10 @@ struct SidebarView: View {
 
             ForEach(claudeProfileViewModel.profiles) { profile in
                 claudeProfileRow(profile)
+                    .trackFrame(id: frameKeyForClaudeProfile(profile.id), in: CoordinateSpace.sidebar) { frame in
+                        itemFrames[frameKeyForClaudeProfile(profile.id)] = frame
+                    }
+                    .simultaneousGesture(dragGestureForClaudeProfile(profile.id))
             }
         }
     }
@@ -248,7 +287,9 @@ struct SidebarView: View {
     }
 
     private func codexProfileRow(_ profile: CodexProfile) -> some View {
-        Button {
+        let isDragging = activeCodexProfileDragID == profile.id
+
+        return Button {
             guard codexProfileViewModel.selectedProfileID != profile.id
                     || appViewModel.selectedFile != nil
                     || claudeProfileViewModel.selectedProfileID != nil else { return }
@@ -292,6 +333,12 @@ struct SidebarView: View {
                     .fill(codexProfileViewModel.selectedProfileID == profile.id ? Color.accentColor.opacity(0.16) : Color.clear)
             )
         }
+        .scaleEffect(isDragging ? 1.015 : 1)
+        .opacity(isDragging ? 0.74 : 1)
+        .shadow(color: .black.opacity(isDragging ? 0.12 : 0), radius: isDragging ? 10 : 0, y: isDragging ? 5 : 0)
+        .zIndex(isDragging ? 1 : 0)
+        .animation(sidebarDragLiftAnimation, value: isDragging)
+        .animation(sidebarReorderAnimation, value: codexProfileViewModel.profiles.map(\.id))
         .buttonStyle(.plain)
         .contextMenu {
             Button(L10n.tr("sidebar.deleteProfile", value: "Delete Profile")) {
@@ -302,7 +349,9 @@ struct SidebarView: View {
     }
 
     private func claudeProfileRow(_ profile: ClaudeProfile) -> some View {
-        Button {
+        let isDragging = activeClaudeProfileDragID == profile.id
+
+        return Button {
             guard claudeProfileViewModel.selectedProfileID != profile.id
                     || appViewModel.selectedFile != nil
                     || codexProfileViewModel.selectedProfileID != nil else { return }
@@ -346,6 +395,12 @@ struct SidebarView: View {
                     .fill(claudeProfileViewModel.selectedProfileID == profile.id ? Color.accentColor.opacity(0.16) : Color.clear)
             )
         }
+        .scaleEffect(isDragging ? 1.015 : 1)
+        .opacity(isDragging ? 0.74 : 1)
+        .shadow(color: .black.opacity(isDragging ? 0.12 : 0), radius: isDragging ? 10 : 0, y: isDragging ? 5 : 0)
+        .zIndex(isDragging ? 1 : 0)
+        .animation(sidebarDragLiftAnimation, value: isDragging)
+        .animation(sidebarReorderAnimation, value: claudeProfileViewModel.profiles.map(\.id))
         .buttonStyle(.plain)
         .contextMenu {
             Button(L10n.tr("sidebar.deleteProfile", value: "Delete Profile")) {
@@ -554,6 +609,142 @@ struct SidebarView: View {
         fileType.systemIconName
     }
 
+    private func frameKeyForAgent(_ id: String) -> String {
+        "agent:\(id)"
+    }
+
+    private func frameKeyForCodexProfile(_ id: UUID) -> String {
+        "codex-profile:\(id.uuidString)"
+    }
+
+    private func frameKeyForClaudeProfile(_ id: UUID) -> String {
+        "claude-profile:\(id.uuidString)"
+    }
+
+    private func dragGestureForAgent(_ id: String) -> some Gesture {
+        DragGesture(minimumDistance: 3, coordinateSpace: .named(CoordinateSpace.sidebar))
+            .onChanged { value in
+                if activeAgentDragID != id {
+                    withAnimation(sidebarDragLiftAnimation) {
+                        activeAgentDragID = id
+                    }
+                }
+                moveDraggedAgent(id, toY: value.location.y)
+            }
+            .onEnded { value in
+                moveDraggedAgent(id, toY: value.location.y)
+                withAnimation(sidebarDragLiftAnimation) {
+                    activeAgentDragID = nil
+                }
+            }
+    }
+
+    private func dragGestureForCodexProfile(_ id: UUID) -> some Gesture {
+        DragGesture(minimumDistance: 3, coordinateSpace: .named(CoordinateSpace.sidebar))
+            .onChanged { value in
+                if activeCodexProfileDragID != id {
+                    withAnimation(sidebarDragLiftAnimation) {
+                        activeCodexProfileDragID = id
+                    }
+                }
+                moveDraggedCodexProfile(id, toY: value.location.y)
+            }
+            .onEnded { value in
+                moveDraggedCodexProfile(id, toY: value.location.y)
+                withAnimation(sidebarDragLiftAnimation) {
+                    activeCodexProfileDragID = nil
+                }
+            }
+    }
+
+    private func dragGestureForClaudeProfile(_ id: UUID) -> some Gesture {
+        DragGesture(minimumDistance: 3, coordinateSpace: .named(CoordinateSpace.sidebar))
+            .onChanged { value in
+                if activeClaudeProfileDragID != id {
+                    withAnimation(sidebarDragLiftAnimation) {
+                        activeClaudeProfileDragID = id
+                    }
+                }
+                moveDraggedClaudeProfile(id, toY: value.location.y)
+            }
+            .onEnded { value in
+                moveDraggedClaudeProfile(id, toY: value.location.y)
+                withAnimation(sidebarDragLiftAnimation) {
+                    activeClaudeProfileDragID = nil
+                }
+            }
+    }
+
+    private func moveDraggedAgent(_ sourceID: String, toY y: CGFloat) {
+        let orderedIDs = appViewModel.agentCategories.map(\.id)
+        let destinationID = destinationAgentID(forY: y, sourceID: sourceID, orderedIDs: orderedIDs)
+        withAnimation(sidebarReorderAnimation) {
+            appViewModel.moveAgentCategory(from: sourceID, to: destinationID)
+        }
+    }
+
+    private func moveDraggedCodexProfile(_ sourceID: UUID, toY y: CGFloat) {
+        let orderedIDs = codexProfileViewModel.profiles.map(\.id)
+        let destinationID = destinationCodexProfileID(forY: y, sourceID: sourceID, orderedIDs: orderedIDs)
+        withAnimation(sidebarReorderAnimation) {
+            codexProfileViewModel.moveProfile(from: sourceID, to: destinationID)
+        }
+    }
+
+    private func moveDraggedClaudeProfile(_ sourceID: UUID, toY y: CGFloat) {
+        let orderedIDs = claudeProfileViewModel.profiles.map(\.id)
+        let destinationID = destinationClaudeProfileID(forY: y, sourceID: sourceID, orderedIDs: orderedIDs)
+        withAnimation(sidebarReorderAnimation) {
+            claudeProfileViewModel.moveProfile(from: sourceID, to: destinationID)
+        }
+    }
+
+    private func destinationAgentID(forY y: CGFloat, sourceID: String, orderedIDs: [String]) -> String? {
+        destinationID(
+            forY: y,
+            sourceID: sourceID,
+            orderedIDs: orderedIDs,
+            frameKey: frameKeyForAgent
+        )
+    }
+
+    private func destinationCodexProfileID(forY y: CGFloat, sourceID: UUID, orderedIDs: [UUID]) -> UUID? {
+        destinationID(
+            forY: y,
+            sourceID: sourceID,
+            orderedIDs: orderedIDs,
+            frameKey: frameKeyForCodexProfile
+        )
+    }
+
+    private func destinationClaudeProfileID(forY y: CGFloat, sourceID: UUID, orderedIDs: [UUID]) -> UUID? {
+        destinationID(
+            forY: y,
+            sourceID: sourceID,
+            orderedIDs: orderedIDs,
+            frameKey: frameKeyForClaudeProfile
+        )
+    }
+
+    private func destinationID<ID: Equatable>(
+        forY y: CGFloat,
+        sourceID: ID,
+        orderedIDs: [ID],
+        frameKey: (ID) -> String
+    ) -> ID? {
+        let otherIDs = orderedIDs.filter { $0 != sourceID }
+        guard !otherIDs.isEmpty else { return nil }
+
+        for id in otherIDs {
+            guard let frame = itemFrames[frameKey(id)] else { continue }
+            if y < frame.midY {
+                return id
+            }
+        }
+
+        return nil
+    }
+
     private func createFile(at url: URL) {
         Task {
             let fileService = FileService()
@@ -655,6 +846,8 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
     let icon: SidebarIcon
     let iconColor: Color
     @Binding var isExpanded: Bool
+    let isDragging: Bool
+    let dragGestureBuilder: (() -> AnyView)?
     @ViewBuilder let content: () -> Content
     @ViewBuilder let contextMenu: (() -> Menu)?
 
@@ -663,6 +856,8 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
         icon: SidebarIcon,
         iconColor: Color,
         isExpanded: Binding<Bool>,
+        isDragging: Bool = false,
+        dragGestureBuilder: (() -> AnyView)? = nil,
         @ViewBuilder content: @escaping () -> Content,
         @ViewBuilder contextMenu: @escaping () -> Menu = { EmptyView() }
     ) {
@@ -670,49 +865,36 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
         self.icon = icon
         self.iconColor = iconColor
         self._isExpanded = isExpanded
+        self.isDragging = isDragging
+        self.dragGestureBuilder = dragGestureBuilder
         self.content = content
         self.contextMenu = contextMenu
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Button {
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    isExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                        .animation(nil, value: isExpanded)
-                        .frame(width: 14)
-
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(iconColor.opacity(0.16))
-                        icon.view
+            if let dragGestureBuilder {
+                dragGestureBuilder()
+                    .scaleEffect(isDragging ? 1.012 : 1)
+                    .opacity(isDragging ? 0.78 : 1)
+                    .shadow(color: .black.opacity(isDragging ? 0.10 : 0), radius: isDragging ? 9 : 0, y: isDragging ? 4 : 0)
+                    .zIndex(isDragging ? 1 : 0)
+                    .animation(sidebarDragLiftAnimation, value: isDragging)
+            } else {
+                SidebarDisclosureSectionHeader(
+                    title: title,
+                    icon: icon,
+                    iconColor: iconColor,
+                    isExpanded: $isExpanded,
+                    contextMenu: {
+                        contextMenu?()
                     }
-                    .frame(width: 22, height: 22)
-
-                    Text(title)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-
-                    Spacer(minLength: 4)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 7)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .contextMenu {
-                contextMenu?()
+                )
+                    .scaleEffect(isDragging ? 1.012 : 1)
+                    .opacity(isDragging ? 0.78 : 1)
+                    .shadow(color: .black.opacity(isDragging ? 0.10 : 0), radius: isDragging ? 9 : 0, y: isDragging ? 4 : 0)
+                    .zIndex(isDragging ? 1 : 0)
+                    .animation(sidebarDragLiftAnimation, value: isDragging)
             }
 
             if isExpanded {
@@ -720,6 +902,56 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
                     content()
                 }
             }
+        }
+        .animation(sidebarReorderAnimation, value: isExpanded)
+    }
+}
+
+private struct SidebarDisclosureSectionHeader<Menu: View>: View {
+    let title: String
+    let icon: SidebarIcon
+    let iconColor: Color
+    @Binding var isExpanded: Bool
+    @ViewBuilder let contextMenu: () -> Menu
+
+    var body: some View {
+        Button {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                isExpanded.toggle()
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .animation(nil, value: isExpanded)
+                    .frame(width: 14)
+
+                ZStack {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(iconColor.opacity(0.16))
+                    icon.view
+                }
+                .frame(width: 22, height: 22)
+
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Spacer(minLength: 4)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            contextMenu()
         }
     }
 }
@@ -739,6 +971,14 @@ private struct DropTargetStyle: ViewModifier {
                     .strokeBorder(isTargeted ? Color.accentColor.opacity(0.65) : Color.clear, style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
             )
             .animation(.easeInOut(duration: 0.12), value: isTargeted)
+    }
+}
+
+private struct FramePreferenceKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
     }
 }
 
@@ -782,6 +1022,20 @@ private enum SidebarIcon {
 private extension View {
     func dropTargetStyle(isTargeted: Bool) -> some View {
         modifier(DropTargetStyle(isTargeted: isTargeted))
+    }
+
+    func trackFrame(id: String, in coordinateSpace: String, onChange: @escaping (CGRect) -> Void) -> some View {
+        background(
+            GeometryReader { proxy in
+                Color.clear
+                    .preference(key: FramePreferenceKey.self, value: [id: proxy.frame(in: .named(coordinateSpace))])
+            }
+        )
+        .onPreferenceChange(FramePreferenceKey.self) { values in
+            if let frame = values[id] {
+                onChange(frame)
+            }
+        }
     }
 }
 

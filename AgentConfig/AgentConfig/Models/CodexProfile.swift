@@ -5,7 +5,7 @@
 
 import Foundation
 
-struct CodexProfile: Identifiable, Codable, Equatable {
+struct CodexProfile: Identifiable, Codable, Equatable, AgentProfileRecord {
     let id: UUID
     var name: String
     var configText: String

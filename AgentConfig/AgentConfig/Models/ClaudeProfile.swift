@@ -5,7 +5,7 @@
 
 import Foundation
 
-struct ClaudeProfile: Identifiable, Codable, Equatable {
+struct ClaudeProfile: Identifiable, Codable, Equatable, AgentProfileRecord {
     static let defaultClaudeJSONText = """
     {
       "hasCompletedOnboarding": true

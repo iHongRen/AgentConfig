@@ -137,6 +137,9 @@ struct AppSettings: Codable {
     /// 用户手动添加到指定分类的文件路径
     var categoryFilePaths: [String: [URL]] = [:]
 
+    /// 用户自定义的 Agent 侧边栏顺序
+    var agentOrder: [String] = []
+
     /// 应用上次停留的配置页
     var lastVisitedPage: LastVisitedPage?
 
@@ -146,6 +149,7 @@ struct AppSettings: Codable {
         case customPaths
         case hiddenFilePaths
         case categoryFilePaths
+        case agentOrder
         case lastVisitedPage
     }
 
@@ -158,6 +162,7 @@ struct AppSettings: Codable {
         customPaths = try container.decodeIfPresent([URL].self, forKey: .customPaths) ?? []
         hiddenFilePaths = try container.decodeIfPresent([URL].self, forKey: .hiddenFilePaths) ?? []
         categoryFilePaths = try container.decodeIfPresent([String: [URL]].self, forKey: .categoryFilePaths) ?? [:]
+        agentOrder = try container.decodeIfPresent([String].self, forKey: .agentOrder) ?? []
         lastVisitedPage = try container.decodeIfPresent(LastVisitedPage.self, forKey: .lastVisitedPage)
     }
 

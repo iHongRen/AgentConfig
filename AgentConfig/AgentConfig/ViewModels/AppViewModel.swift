@@ -94,9 +94,10 @@ final class AppViewModel: ObservableObject {
         async let envResult = scanner.scanEnvFiles()
 
         let (agents, env) = await (agentResult, envResult)
-        agentCategories = filterHiddenFiles(from: mergeAddedFiles(into: agents))
+        agentCategories = sortAgentCategories(filterHiddenFiles(from: mergeAddedFiles(into: agents)))
         envCategory = filterHiddenFiles(from: mergeAddedFiles(into: env))
         customPathGroups = filterHiddenFiles(from: scanCustomPaths())
+        updateStoredAgentOrder(with: agentCategories.map(\.id))
         didFinishInitialRefresh = true
     }
 
@@ -134,6 +135,22 @@ final class AppViewModel: ObservableObject {
         guard settings.lastVisitedPage != page else { return }
         settings.lastVisitedPage = page
         settings.save()
+    }
+
+    func moveAgentCategory(from sourceID: String, to destinationID: String?) {
+        let currentIDs = agentCategories.map(\.id)
+        guard let sourceIndex = currentIDs.firstIndex(of: sourceID) else { return }
+
+        var reorderedIDs = currentIDs
+        let movedID = reorderedIDs.remove(at: sourceIndex)
+
+        if let destinationID, let destinationIndex = reorderedIDs.firstIndex(of: destinationID) {
+            reorderedIDs.insert(movedID, at: destinationIndex)
+        } else {
+            reorderedIDs.append(movedID)
+        }
+
+        applyAgentOrder(reorderedIDs)
     }
 
     // MARK: - Category Files
@@ -209,6 +226,48 @@ final class AppViewModel: ObservableObject {
             result.append(file)
         }
         return result
+    }
+
+    private func sortAgentCategories(_ categories: [AgentCategory]) -> [AgentCategory] {
+        sortAgentCategories(categories, using: settings.agentOrder)
+    }
+
+    private func sortAgentCategories(_ categories: [AgentCategory], using orderedIDs: [String]) -> [AgentCategory] {
+        let orderLookup = Dictionary(uniqueKeysWithValues: orderedIDs.enumerated().map { ($0.element, $0.offset) })
+        return categories.sorted { lhs, rhs in
+            let lhsOrder = orderLookup[lhs.id] ?? Int.max
+            let rhsOrder = orderLookup[rhs.id] ?? Int.max
+            if lhsOrder != rhsOrder {
+                return lhsOrder < rhsOrder
+            }
+
+            let lhsDefinitionIndex = AgentDefinitions.all.firstIndex(where: { $0.id == lhs.id }) ?? Int.max
+            let rhsDefinitionIndex = AgentDefinitions.all.firstIndex(where: { $0.id == rhs.id }) ?? Int.max
+            if lhsDefinitionIndex != rhsDefinitionIndex {
+                return lhsDefinitionIndex < rhsDefinitionIndex
+            }
+
+            return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
+        }
+    }
+
+    private func applyAgentOrder(_ orderedIDs: [String]) {
+        let knownIDs = Set(agentCategories.map(\.id))
+        let normalizedOrder = orderedIDs.filter { knownIDs.contains($0) }
+
+        settings.agentOrder = normalizedOrder
+        agentCategories = sortAgentCategories(agentCategories, using: normalizedOrder)
+        settings.save()
+    }
+
+    private func updateStoredAgentOrder(with visibleIDs: [String]) {
+        let existingVisibleIDs = settings.agentOrder.filter { visibleIDs.contains($0) }
+        let missingIDs = visibleIDs.filter { !existingVisibleIDs.contains($0) }
+        let updatedOrder = existingVisibleIDs + missingIDs
+
+        guard settings.agentOrder != updatedOrder else { return }
+        settings.agentOrder = updatedOrder
+        settings.save()
     }
 
     // MARK: - Hidden Files Filtering
