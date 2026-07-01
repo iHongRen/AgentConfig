@@ -163,7 +163,7 @@ struct SidebarView: View {
                 Divider()
 
                 Button(L10n.tr("sidebar.openInFinder", value: "Open in Finder")) {
-                    let representativeURL = category.files.first?.url ?? category.missingPaths.first
+                    let representativeURL = finderTargetURL(for: category)
                     if let url = representativeURL {
                         NSWorkspace.shared.activateFileViewerSelecting([url])
                     }
@@ -179,13 +179,13 @@ struct SidebarView: View {
 
     private var codexProfileSection: some View {
         VStack(alignment: .leading, spacing: 1) {
-            HStack {
+            HStack(alignment: .center) {
                 sidebarSubheading(L10n.tr("sidebar.profilesSection", value: "Profiles"))
+
+                CountBadge(count: codexProfileViewModel.profiles.count)
 
                 Spacer()
 
-                CountBadge(count: codexProfileViewModel.profiles.count)
-                
                 Button {
                     codexProfileViewModel.addProfile()
                     if appViewModel.selectedFile != nil {
@@ -201,7 +201,7 @@ struct SidebarView: View {
                 .padding(.trailing, 4)
 
             }
-
+            
             ForEach(codexProfileViewModel.profiles) { profile in
                 codexProfileRow(profile)
             }
@@ -212,10 +212,9 @@ struct SidebarView: View {
         VStack(alignment: .leading, spacing: 1) {
             HStack {
                 sidebarSubheading(L10n.tr("sidebar.profilesSection", value: "Profiles"))
+                CountBadge(count: claudeProfileViewModel.profiles.count)
 
                 Spacer()
-
-                CountBadge(count: claudeProfileViewModel.profiles.count)
 
                 Button {
                     claudeProfileViewModel.addProfile()
@@ -241,12 +240,11 @@ struct SidebarView: View {
 
     private func sidebarSubheading(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 10, weight: .bold))
+            .font(.system(size: 11, weight: .bold))
             .foregroundStyle(.secondary)
             .textCase(.uppercase)
             .padding(.leading, 34)
-            .padding(.top, 8)
-            .padding(.bottom, 3)
+         
     }
 
     private func codexProfileRow(_ profile: CodexProfile) -> some View {
@@ -530,6 +528,28 @@ struct SidebarView: View {
             ?? category.missingPaths.first?.deletingLastPathComponent()
     }
 
+    private func finderTargetURL(for category: AgentCategory) -> URL? {
+        guard let definition = AgentDefinitions.definition(for: category.id) else {
+            return category.files.first?.url ?? category.missingPaths.first
+        }
+
+        let configuredURLs = definition.configFiles.flatMap(\.resolvedURLs).map(\.standardizedFileURL)
+
+        for configuredURL in configuredURLs {
+            if let matchedFile = category.files.first(where: { $0.url.standardizedFileURL == configuredURL }) {
+                return matchedFile.url
+            }
+        }
+
+        for configuredURL in configuredURLs {
+            if let matchedMissingURL = category.missingPaths.first(where: { $0.standardizedFileURL == configuredURL }) {
+                return matchedMissingURL
+            }
+        }
+
+        return category.files.first?.url ?? category.missingPaths.first
+    }
+
     private func fileTypeIcon(for fileType: FileType) -> String {
         fileType.systemIconName
     }
@@ -727,11 +747,11 @@ private struct CountBadge: View {
 
     var body: some View {
         Text("\(count)")
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: 9, weight: .semibold))
             .foregroundStyle(.secondary)
             .monospacedDigit()
-            .padding(.horizontal, 8)
-            .padding(.vertical, 2)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 1)
             .background(
                 Capsule()
                     .fill(Color(nsColor: .quaternaryLabelColor))

@@ -146,7 +146,6 @@ struct AgentProfileEditorView: View {
             }
             .buttonStyle(.plain)
             .disabled(!profile.canDelete)
-            .opacity(profile.canDelete ? 1 : 0.45)
             .help(L10n.tr("profile.deleteCurrent", value: "Delete current profile"))
 
             Button {
@@ -215,7 +214,7 @@ struct AgentProfileEditorView: View {
 
                 Text(L10n.format("profile.lineCount", value: "%d lines", lineCount(in: field.text.wrappedValue)))
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
 
                 if let helpText = field.helpText {
@@ -225,9 +224,11 @@ struct AgentProfileEditorView: View {
                 Spacer(minLength: 8)
 
                 Button(L10n.tr("profile.copy", value: "Copy")) {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(field.text.wrappedValue, forType: .string)
-                    showToast(L10n.tr("profile.copyToast", value: "Copied current configuration snippet"))
+                    if !field.text.wrappedValue.isEmpty {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(field.text.wrappedValue, forType: .string)
+                        showToast(L10n.tr("profile.copyToast", value: "Copied current configuration snippet"))
+                    }
                 }
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Color(red: 0.6, green: 0.6, blue: 0.6))
