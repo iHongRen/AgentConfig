@@ -336,6 +336,7 @@ struct SidebarView: View {
         .scaleEffect(isDragging ? 1.015 : 1)
         .opacity(isDragging ? 0.74 : 1)
         .shadow(color: .black.opacity(isDragging ? 0.12 : 0), radius: isDragging ? 10 : 0, y: isDragging ? 5 : 0)
+        .offset(y: isDragging ? -2 : 0)
         .zIndex(isDragging ? 1 : 0)
         .animation(sidebarDragLiftAnimation, value: isDragging)
         .animation(sidebarReorderAnimation, value: codexProfileViewModel.profiles.map(\.id))
@@ -398,6 +399,7 @@ struct SidebarView: View {
         .scaleEffect(isDragging ? 1.015 : 1)
         .opacity(isDragging ? 0.74 : 1)
         .shadow(color: .black.opacity(isDragging ? 0.12 : 0), radius: isDragging ? 10 : 0, y: isDragging ? 5 : 0)
+        .offset(y: isDragging ? -2 : 0)
         .zIndex(isDragging ? 1 : 0)
         .animation(sidebarDragLiftAnimation, value: isDragging)
         .animation(sidebarReorderAnimation, value: claudeProfileViewModel.profiles.map(\.id))
@@ -878,6 +880,7 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
                     .scaleEffect(isDragging ? 1.012 : 1)
                     .opacity(isDragging ? 0.78 : 1)
                     .shadow(color: .black.opacity(isDragging ? 0.10 : 0), radius: isDragging ? 9 : 0, y: isDragging ? 4 : 0)
+                    .offset(y: isDragging ? -2 : 0)
                     .zIndex(isDragging ? 1 : 0)
                     .animation(sidebarDragLiftAnimation, value: isDragging)
             } else {
@@ -893,6 +896,7 @@ private struct SidebarDisclosureSection<Content: View, Menu: View>: View {
                     .scaleEffect(isDragging ? 1.012 : 1)
                     .opacity(isDragging ? 0.78 : 1)
                     .shadow(color: .black.opacity(isDragging ? 0.10 : 0), radius: isDragging ? 9 : 0, y: isDragging ? 4 : 0)
+                    .offset(y: isDragging ? -2 : 0)
                     .zIndex(isDragging ? 1 : 0)
                     .animation(sidebarDragLiftAnimation, value: isDragging)
             }
