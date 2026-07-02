@@ -219,8 +219,10 @@ struct MainContentView: View {
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(
+                editorViewModel: editorViewModel,
                 codexProfileViewModel: codexProfileViewModel,
-                claudeProfileViewModel: claudeProfileViewModel
+                claudeProfileViewModel: claudeProfileViewModel,
+                onNavigate: handleNavigation
             )
                 .environmentObject(appViewModel)
         } detail: {
@@ -231,7 +233,8 @@ struct MainContentView: View {
             } else {
                 EditorView(
                     editorViewModel: editorViewModel,
-                    saveCoordinator: saveCoordinator
+                    saveCoordinator: saveCoordinator,
+                    onConfirmNavigation: handleNavigation
                 )
             }
         }
@@ -276,6 +279,27 @@ struct MainContentView: View {
         }
         .onAppear {
             resolveInitialPageIfNeeded()
+        }
+    }
+
+    private func handleNavigation(_ target: EditorViewModel.PendingNavigationTarget) {
+        switch target {
+        case .configFile(let file):
+            codexProfileViewModel.clearSelection()
+            claudeProfileViewModel.clearSelection()
+            appViewModel.selectFile(file)
+        case .codexProfile(let id):
+            appViewModel.selectFile(nil)
+            claudeProfileViewModel.clearSelection()
+            if let profile = codexProfileViewModel.profiles.first(where: { $0.id == id }) {
+                codexProfileViewModel.selectProfile(profile)
+            }
+        case .claudeProfile(let id):
+            appViewModel.selectFile(nil)
+            codexProfileViewModel.clearSelection()
+            if let profile = claudeProfileViewModel.profiles.first(where: { $0.id == id }) {
+                claudeProfileViewModel.selectProfile(profile)
+            }
         }
     }
 

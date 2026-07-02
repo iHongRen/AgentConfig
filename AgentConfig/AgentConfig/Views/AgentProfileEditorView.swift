@@ -20,6 +20,7 @@ struct AgentProfileEditorView: View {
     @State private var resizingFields: Set<String> = []
     @State private var isDeleteConfirmationPresented = false
     @State private var editingProfileName: String = ""
+    @State private var formatErrorMessage: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -66,6 +67,13 @@ struct AgentProfileEditorView: View {
         }
         .onDisappear {
             toastTask?.cancel()
+        }
+        .alert(L10n.tr("profile.formatFailed.title", value: "Format Failed"), isPresented: formatErrorBinding) {
+            Button(L10n.tr("profile.ok", value: "OK"), role: .cancel) {
+                formatErrorMessage = nil
+            }
+        } message: {
+            Text(formatErrorMessage ?? L10n.tr("profile.formatFailed.message", value: "Unable to format this JSON snippet."))
         }
         .alert(isPresented: $isDeleteConfirmationPresented) {
             let confirmation = profile?.deleteConfirmation
@@ -235,6 +243,17 @@ struct AgentProfileEditorView: View {
                 .frame(height: 24)
                 .buttonStyle(.plain)
                 .help(L10n.tr("profile.copyHelp", value: "Copy"))
+
+                if field.supportsFormatting {
+                    Button(L10n.tr("profile.format", value: "Format")) {
+                        format(field: field)
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(field.accentColor)
+                    .frame(height: 24)
+                    .buttonStyle(.plain)
+                    .help(L10n.tr("profile.formatJSONHelp", value: "Format JSON with 2-space indentation"))
+                }
             }
             .padding(.horizontal, 12)
             .frame(height: 32)
@@ -242,7 +261,8 @@ struct AgentProfileEditorView: View {
 
             Divider()
 
-            AgentProfileCodeEditor(
+            AgentProfileCodeEditorContainer(
+                fieldID: field.id,
                 text: field.text,
                 measuredHeight: measuredHeightBinding(for: field),
                 fileType: field.fileType,
@@ -265,8 +285,6 @@ struct AgentProfileEditorView: View {
                     resizingFields.remove(field.id)
                 }
             )
-            .frame(height: editorHeight(for: field))
-            .background(Color(nsColor: .textBackgroundColor))
         }
         .background(Color(nsColor: .textBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -370,6 +388,40 @@ struct AgentProfileEditorView: View {
         }
     }
 
+    private func format(field: AgentProfileEditorField) {
+        do {
+            field.text.wrappedValue = try formatJSON(field.text.wrappedValue)
+            showToast(L10n.tr("profile.formatSuccess", value: "JSON formatted"))
+        } catch {
+            formatErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func formatJSON(_ text: String) throws -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let source = trimmed.isEmpty ? "{}" : trimmed
+        let data = Data(source.utf8)
+        let jsonObject = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
+        let formattedData = try JSONSerialization.data(withJSONObject: jsonObject, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+        guard var formatted = String(data: formattedData, encoding: .utf8) else {
+            throw NSError(domain: NSCocoaErrorDomain, code: CocoaError.fileWriteUnknown.rawValue)
+        }
+
+        formatted = formatted.replacingOccurrences(of: "    ", with: "  ")
+        return formatted
+    }
+
+    private var formatErrorBinding: Binding<Bool> {
+        Binding(
+            get: { formatErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    formatErrorMessage = nil
+                }
+            }
+        )
+    }
+
     private func savedEditorHeights(for profile: AgentProfileEditorProfile?) -> [String: CGFloat] {
         guard let profile else { return [:] }
 
@@ -415,6 +467,10 @@ struct AgentProfileEditorField: Identifiable {
     let text: Binding<String>
     let persistedHeight: Double?
     let onPersistHeight: (Double) -> Void
+
+    var supportsFormatting: Bool {
+        fileType == .json
+    }
 }
 
 struct AgentProfileEditorStatus {

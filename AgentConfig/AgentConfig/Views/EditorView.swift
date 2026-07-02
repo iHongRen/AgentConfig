@@ -602,6 +602,7 @@ struct EditorView: View {
 
     @ObservedObject var editorViewModel: EditorViewModel
     @ObservedObject var saveCoordinator: CommandCoordinator
+    let onConfirmNavigation: (EditorViewModel.PendingNavigationTarget) -> Void
 
     @Environment(\.colorScheme) var colorScheme
 
@@ -654,6 +655,30 @@ struct EditorView: View {
             }
         } message: {
             Text(L10n.tr("editor.externalChange.message", value: "This file changed outside the app. Choose whether to write the app's unsaved changes back to disk or replace the editor with the external version."))
+        }
+        .alert(
+            L10n.tr("editor.unsavedChanges.title", value: "Unsaved Changes"),
+            isPresented: $editorViewModel.hasPendingUnsavedChangesConfirmation
+        ) {
+            Button(L10n.tr("editor.unsavedChanges.save", value: "Save")) {
+                Task {
+                    if let target = await editorViewModel.confirmPendingNavigationSavingChanges() {
+                        await MainActor.run {
+                            onConfirmNavigation(target)
+                        }
+                    }
+                }
+            }
+            Button(L10n.tr("editor.unsavedChanges.discard", value: "Discard"), role: .destructive) {
+                if let target = editorViewModel.confirmPendingNavigationDiscardingChanges() {
+                    onConfirmNavigation(target)
+                }
+            }
+            Button(L10n.tr("editor.unsavedChanges.cancel", value: "Cancel"), role: .cancel) {
+                editorViewModel.cancelPendingNavigation()
+            }
+        } message: {
+            Text(L10n.tr("editor.unsavedChanges.message", value: "You have unsaved changes. Save them before switching to another configuration?"))
         }
         .alert(L10n.tr("editor.saveFailed.title", value: "Save Failed"), isPresented: saveErrorBinding) {
             Button(L10n.tr("editor.saveFailed.ok", value: "OK"), role: .destructive) {

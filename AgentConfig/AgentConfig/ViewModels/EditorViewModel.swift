@@ -18,6 +18,12 @@ import Combine
 @MainActor
 final class EditorViewModel: ObservableObject {
 
+    enum PendingNavigationTarget {
+        case configFile(ConfigFile)
+        case codexProfile(UUID)
+        case claudeProfile(UUID)
+    }
+
     // MARK: - Published Properties
 
     /// 编辑器当前内容
@@ -53,6 +59,9 @@ final class EditorViewModel: ObservableObject {
     /// 是否存在外部文件冲突（外部修改 + 本地未保存修改同时存在）
     @Published var hasExternalConflict: Bool = false
 
+    /// 是否存在待确认的未保存切换
+    @Published var hasPendingUnsavedChangesConfirmation: Bool = false
+
     // MARK: - Internal State
 
     /// 当前打开的文件
@@ -79,6 +88,9 @@ final class EditorViewModel: ObservableObject {
 
     /// 标记是否正在加载内容（加载时不触发 isModified 和 undo 注册）
     private var isLoadingContent: Bool = false
+
+    /// 用户确认后要执行的切换目标
+    private var pendingNavigationTarget: PendingNavigationTarget?
 
     // MARK: - Init
 
@@ -237,6 +249,42 @@ final class EditorViewModel: ObservableObject {
                 isModified = false
             }
         }
+    }
+
+    func requestNavigation(to target: PendingNavigationTarget) -> Bool {
+        guard currentFile != nil, isModified else { return true }
+        guard !hasExternalConflict else { return false }
+
+        pendingNavigationTarget = target
+        hasPendingUnsavedChangesConfirmation = true
+        return false
+    }
+
+    func takePendingNavigationTarget() -> PendingNavigationTarget? {
+        defer { pendingNavigationTarget = nil }
+        return pendingNavigationTarget
+    }
+
+    func confirmPendingNavigationSavingChanges() async -> PendingNavigationTarget? {
+        do {
+            try await save()
+            hasPendingUnsavedChangesConfirmation = false
+            return takePendingNavigationTarget()
+        } catch {
+            hasPendingUnsavedChangesConfirmation = false
+            return nil
+        }
+    }
+
+    func confirmPendingNavigationDiscardingChanges() -> PendingNavigationTarget? {
+        isModified = false
+        hasPendingUnsavedChangesConfirmation = false
+        return takePendingNavigationTarget()
+    }
+
+    func cancelPendingNavigation() {
+        pendingNavigationTarget = nil
+        hasPendingUnsavedChangesConfirmation = false
     }
 
     // MARK: - Undo / Redo

@@ -19,8 +19,10 @@ struct SidebarView: View {
     }
 
     @EnvironmentObject var appViewModel: AppViewModel
+    @ObservedObject var editorViewModel: EditorViewModel
     @ObservedObject var codexProfileViewModel: CodexProfileViewModel
     @ObservedObject var claudeProfileViewModel: ClaudeProfileViewModel
+    let onNavigate: (EditorViewModel.PendingNavigationTarget) -> Void
 
     @State private var isEnvExpanded = true
     @State private var expandedAgentIDs: Set<String> = []
@@ -293,11 +295,7 @@ struct SidebarView: View {
             guard codexProfileViewModel.selectedProfileID != profile.id
                     || appViewModel.selectedFile != nil
                     || claudeProfileViewModel.selectedProfileID != nil else { return }
-            if appViewModel.selectedFile != nil {
-                appViewModel.selectFile(nil)
-            }
-            claudeProfileViewModel.clearSelection()
-            codexProfileViewModel.selectProfile(profile)
+            navigate(to: .codexProfile(profile.id))
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "rectangle.stack")
@@ -356,11 +354,7 @@ struct SidebarView: View {
             guard claudeProfileViewModel.selectedProfileID != profile.id
                     || appViewModel.selectedFile != nil
                     || codexProfileViewModel.selectedProfileID != nil else { return }
-            if appViewModel.selectedFile != nil {
-                appViewModel.selectFile(nil)
-            }
-            codexProfileViewModel.clearSelection()
-            claudeProfileViewModel.selectProfile(profile)
+            navigate(to: .claudeProfile(profile.id))
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "rectangle.stack")
@@ -417,9 +411,7 @@ struct SidebarView: View {
             guard appViewModel.selectedFile?.url != file.url
                     || codexProfileViewModel.selectedProfileID != nil
                     || claudeProfileViewModel.selectedProfileID != nil else { return }
-            codexProfileViewModel.clearSelection()
-            claudeProfileViewModel.clearSelection()
-            appViewModel.selectFile(file)
+            navigate(to: .configFile(file))
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: fileTypeIcon(for: file.fileType))
@@ -839,6 +831,12 @@ struct SidebarView: View {
 
         if let match = AgentDefinitions.match(for: standardizedURL) {
             expandCategory(.agent(id: match.definition.id))
+        }
+    }
+
+    private func navigate(to target: EditorViewModel.PendingNavigationTarget) {
+        if editorViewModel.requestNavigation(to: target) {
+            onNavigate(target)
         }
     }
 }

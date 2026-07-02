@@ -53,19 +53,19 @@ struct CodexProfile: Identifiable, Codable, Equatable, AgentProfileRecord {
     static var defaultProfiles: [CodexProfile] {
         let config = """
         model_provider = "OpenAI"
-        model = "gpt-5.4"
-        review_model = "gpt-5.4"
+        model = "gpt-5.5"
+        review_model = "gpt-5.5"
 
         [model_providers.OpenAI]
         name = "OpenAI"
-        base_url = "https://xxx.com"
+        base_url = "https://xxx.com/v1"
         wire_api = "responses"
         requires_openai_auth = true
         """
 
         let auth = """
         {
-          "OPENAI_API_KEY" : "sk-main-0c7e-86f12-preview-token"
+          "OPENAI_API_KEY" : "your api key"
         }
         """
 
