@@ -39,7 +39,10 @@ final class CodexProfileViewModel: AgentProfileCollectionViewModel<CodexProfile>
                     return id
                 },
                 minimumProfileCountMessage: L10n.tr("profile.codex.minCount", value: "At least one Codex Profile must be kept."),
-                profileNotFoundMessage: L10n.tr("profile.codex.notFound", value: "The Codex Profile to delete could not be found.")
+                profileNotFoundMessage: L10n.tr("profile.codex.notFound", value: "The Codex Profile to delete could not be found."),
+                readDiskContents: { try await resolvedService.readDiskContents() },
+                isProfileOutOfSync: Self.isProfileOutOfSync,
+                watchedFileURLs: { resolvedService.targetFileURLs() }
             )
         )
     }
@@ -101,5 +104,11 @@ final class CodexProfileViewModel: AgentProfileCollectionViewModel<CodexProfile>
         ProfileContentNormalizer.text(profile.configText) != ProfileContentNormalizer.text(profile.appliedConfigText)
             || ProfileContentNormalizer.json(profile.authText) != ProfileContentNormalizer.json(profile.appliedAuthText)
             || ProfileContentNormalizer.text(profile.zshrcText) != ProfileContentNormalizer.text(profile.appliedZshrcText)
+    }
+
+    nonisolated private static func isProfileOutOfSync(_ profile: CodexProfile, _ disk: ProfileDiskContents) -> Bool {
+        ProfileContentNormalizer.text(profile.appliedConfigText) != ProfileContentNormalizer.text(disk.configText ?? "")
+            || ProfileContentNormalizer.json(profile.appliedAuthText) != ProfileContentNormalizer.json(disk.authText ?? "")
+            || ProfileContentNormalizer.text(profile.appliedZshrcText) != ProfileContentNormalizer.text(disk.zshrcText ?? "")
     }
 }

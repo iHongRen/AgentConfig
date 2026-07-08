@@ -58,6 +58,7 @@
 "profile.status.modified" = "Unapplied Changes";
 "profile.status.active" = "Active";
 "profile.status.ready" = "Ready to Apply";
+"profile.status.external" = "External Changes";
 "sidebar.removeFromListTitle" = "Remove from list?";
 "sidebar.removeFromListMessage" = "This removes the file from the sidebar but does not delete the file.\n%@";
 "sidebar.remove" = "Remove";
@@ -78,6 +79,7 @@
 "sidebar.unapplied" = "Unapplied";
 "sidebar.applied" = "Applied";
 "sidebar.draft" = "Draft";
+"sidebar.external" = "External";
 "sidebar.create" = "Create";
 "sidebar.addFilePanel.title" = "Add File";
 "sidebar.addFilePanel.message" = "Choose files to add to this category";

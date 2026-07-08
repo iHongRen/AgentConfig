@@ -9,6 +9,8 @@ protocol CodexProfileServiceProtocol {
     func loadProfiles() async throws -> [CodexProfile]
     func saveProfiles(_ profiles: [CodexProfile]) async throws
     func apply(profile: CodexProfile) async throws
+    func targetFileURLs() -> [URL]
+    func readDiskContents() async throws -> ProfileDiskContents
 }
 
 final class CodexProfileService: CodexProfileServiceProtocol {
@@ -63,6 +65,18 @@ final class CodexProfileService: CodexProfileServiceProtocol {
     }
 
     private var fileManager: FileManager { fileService.fileManager }
+
+    func targetFileURLs() -> [URL] {
+        [codexConfigURL, codexAuthURL, fileService.zshrcURL]
+    }
+
+    func readDiskContents() async throws -> ProfileDiskContents {
+        ProfileDiskContents(
+            configText: fileService.readIfExists(at: codexConfigURL),
+            authText: fileService.readIfExists(at: codexAuthURL),
+            zshrcText: fileService.extractManagedZshrcBlock(blockID: "Codex Profile")
+        )
+    }
 
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()

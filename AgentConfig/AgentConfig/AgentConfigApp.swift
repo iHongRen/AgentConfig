@@ -177,6 +177,8 @@ struct AgentConfigApp: App {
             queue: .main
         ) { _ in
             Task { await editorViewModel.onForeground() }
+            Task { await codexProfileViewModel.refreshDiskSyncState() }
+            Task { await claudeProfileViewModel.refreshDiskSyncState() }
         }
     }
 

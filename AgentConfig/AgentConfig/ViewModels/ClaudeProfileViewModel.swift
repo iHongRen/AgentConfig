@@ -39,7 +39,10 @@ final class ClaudeProfileViewModel: AgentProfileCollectionViewModel<ClaudeProfil
                     return id
                 },
                 minimumProfileCountMessage: L10n.tr("profile.claude.minCount", value: "At least one Claude Profile must be kept."),
-                profileNotFoundMessage: L10n.tr("profile.claude.notFound", value: "The Claude Profile to delete could not be found.")
+                profileNotFoundMessage: L10n.tr("profile.claude.notFound", value: "The Claude Profile to delete could not be found."),
+                readDiskContents: { try await resolvedService.readDiskContents() },
+                isProfileOutOfSync: Self.isProfileOutOfSync,
+                watchedFileURLs: { resolvedService.targetFileURLs() }
             )
         )
     }
@@ -106,6 +109,12 @@ final class ClaudeProfileViewModel: AgentProfileCollectionViewModel<ClaudeProfil
         ProfileContentNormalizer.json(profile.settingsText) != ProfileContentNormalizer.json(profile.appliedSettingsText)
             || ProfileContentNormalizer.json(profile.claudeJSONText) != ProfileContentNormalizer.json(profile.appliedClaudeJSONText)
             || ProfileContentNormalizer.text(profile.zshrcText) != ProfileContentNormalizer.text(profile.appliedZshrcText)
+    }
+
+    nonisolated private static func isProfileOutOfSync(_ profile: ClaudeProfile, _ disk: ProfileDiskContents) -> Bool {
+        ProfileContentNormalizer.json(profile.appliedSettingsText) != ProfileContentNormalizer.json(disk.configText ?? "")
+            || !ProfileContentNormalizer.jsonSubset(disk.authText ?? "", profile.appliedClaudeJSONText)
+            || ProfileContentNormalizer.text(profile.appliedZshrcText) != ProfileContentNormalizer.text(disk.zshrcText ?? "")
     }
 
     private static func makeFallbackProfile() -> ClaudeProfile {

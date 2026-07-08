@@ -94,6 +94,9 @@ struct CodexProfileEditorView: View {
         if profile.isDirty {
             return AgentProfileEditorStatus(text: L10n.tr("profile.status.modified", value: "Unapplied Changes"), color: .orange)
         }
+        if profile.isActive && viewModel.isDiskOutOfSync {
+            return AgentProfileEditorStatus(text: L10n.tr("profile.status.external", value: "External Changes"), color: .red)
+        }
         if profile.isActive {
             return AgentProfileEditorStatus(text: L10n.tr("profile.status.active", value: "Active"), color: .green)
         }

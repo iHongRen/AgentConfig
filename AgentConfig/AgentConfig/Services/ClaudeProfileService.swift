@@ -9,6 +9,8 @@ protocol ClaudeProfileServiceProtocol {
     func loadProfiles() async throws -> [ClaudeProfile]
     func saveProfiles(_ profiles: [ClaudeProfile]) async throws
     func apply(profile: ClaudeProfile) async throws
+    func targetFileURLs() -> [URL]
+    func readDiskContents() async throws -> ProfileDiskContents
 }
 
 final class ClaudeProfileService: ClaudeProfileServiceProtocol {
@@ -78,6 +80,18 @@ final class ClaudeProfileService: ClaudeProfileServiceProtocol {
     }
 
     private var fileManager: FileManager { fileService.fileManager }
+
+    func targetFileURLs() -> [URL] {
+        [claudeSettingsURL, claudeStateURL, fileService.zshrcURL]
+    }
+
+    func readDiskContents() async throws -> ProfileDiskContents {
+        ProfileDiskContents(
+            configText: fileService.readIfExists(at: claudeSettingsURL),
+            authText: fileService.readIfExists(at: claudeStateURL),
+            zshrcText: fileService.extractManagedZshrcBlock(blockID: "Claude Profile")
+        )
+    }
 
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()

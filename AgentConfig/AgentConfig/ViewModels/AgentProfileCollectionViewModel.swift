@@ -6,6 +6,13 @@
 import Combine
 import Foundation
 
+/// 从磁盘读取到的 profile 目标文件当前内容（已按写入时方式规范化/提取）。
+struct ProfileDiskContents {
+    let configText: String?
+    let authText: String?
+    let zshrcText: String?
+}
+
 protocol AgentProfileRecord: Identifiable, Equatable where ID == UUID {
     var name: String { get set }
     var isActive: Bool { get set }
@@ -25,6 +32,12 @@ struct AgentProfileCollectionConfiguration<Profile: AgentProfileRecord> {
     let minimumProfileCountMessage: String
     let profileNotFoundMessage: String
     let persistDebounceNanoseconds: UInt64
+    /// 读取当前磁盘上 profile 目标文件的内容，用于探测外部改动
+    let readDiskContents: () async throws -> ProfileDiskContents
+    /// 判定给定 profile（基于其 applied 快照）是否与磁盘内容失同步（外部改动）
+    let isProfileOutOfSync: (Profile, ProfileDiskContents) -> Bool
+    /// 需要监听外部改动的磁盘文件 URL
+    let watchedFileURLs: () -> [URL]
 
     init(
         profileNameMaxLength: Int,
@@ -38,7 +51,10 @@ struct AgentProfileCollectionConfiguration<Profile: AgentProfileRecord> {
         lastVisitedProfileID: @escaping (LastVisitedPage) -> UUID?,
         minimumProfileCountMessage: String,
         profileNotFoundMessage: String,
-        persistDebounceNanoseconds: UInt64 = 350_000_000
+        persistDebounceNanoseconds: UInt64 = 350_000_000,
+        readDiskContents: @escaping () async throws -> ProfileDiskContents,
+        isProfileOutOfSync: @escaping (Profile, ProfileDiskContents) -> Bool,
+        watchedFileURLs: @escaping () -> [URL]
     ) {
         self.profileNameMaxLength = profileNameMaxLength
         self.loadProfiles = loadProfiles
@@ -52,6 +68,9 @@ struct AgentProfileCollectionConfiguration<Profile: AgentProfileRecord> {
         self.minimumProfileCountMessage = minimumProfileCountMessage
         self.profileNotFoundMessage = profileNotFoundMessage
         self.persistDebounceNanoseconds = persistDebounceNanoseconds
+        self.readDiskContents = readDiskContents
+        self.isProfileOutOfSync = isProfileOutOfSync
+        self.watchedFileURLs = watchedFileURLs
     }
 }
 
@@ -62,18 +81,26 @@ class AgentProfileCollectionViewModel<Profile: AgentProfileRecord>: ObservableOb
     @Published var lastErrorMessage: String?
     @Published var lastAppliedProfileName: String?
     @Published private(set) var didFinishInitialLoad: Bool = false
+    /// 当前生效（active）的 profile 是否与磁盘实际内容失同步（被外部改动）
+    @Published var isDiskOutOfSync: Bool = false
 
     private let configuration: AgentProfileCollectionConfiguration<Profile>
+    private let fileWatcher: FileWatcherProtocol
     private var persistTask: Task<Void, Never>?
     private var hasRestoredInitialSelection = false
 
-    init(configuration: AgentProfileCollectionConfiguration<Profile>) {
+    init(
+        configuration: AgentProfileCollectionConfiguration<Profile>,
+        fileWatcher: FileWatcherProtocol = FileWatcher()
+    ) {
         self.configuration = configuration
+        self.fileWatcher = fileWatcher
         Task { await loadProfiles() }
     }
 
     deinit {
         persistTask?.cancel()
+        fileWatcher.stopWatching()
     }
 
     var selectedProfile: Profile? {
@@ -93,6 +120,32 @@ class AgentProfileCollectionViewModel<Profile: AgentProfileRecord>: ObservableOb
             profiles = fallbackProfiles.map { refreshedDirtyState(for: $0) }
             selectedProfileID = fallbackProfiles.first?.id
             lastErrorMessage = error.localizedDescription
+        }
+
+        startWatchingAndRefresh()
+    }
+
+    /// 开始监听 profile 目标文件的外部改动，并立即比对一次磁盘状态
+    private func startWatchingAndRefresh() {
+        let urls = configuration.watchedFileURLs()
+        fileWatcher.watch(urls: urls) { [weak self] _ in
+            Task { @MainActor in await self?.refreshDiskSyncState() }
+        }
+        Task { @MainActor in await self.refreshDiskSyncState() }
+    }
+
+    /// 读取磁盘内容并与 active profile 的 applied 快照比对，更新 `isDiskOutOfSync`
+    func refreshDiskSyncState() async {
+        guard let activeProfile = profiles.first(where: { $0.isActive }) else {
+            isDiskOutOfSync = false
+            return
+        }
+
+        do {
+            let disk = try await configuration.readDiskContents()
+            isDiskOutOfSync = configuration.isProfileOutOfSync(activeProfile, disk)
+        } catch {
+            isDiskOutOfSync = false
         }
     }
 
@@ -189,6 +242,7 @@ class AgentProfileCollectionViewModel<Profile: AgentProfileRecord>: ObservableOb
             lastAppliedProfileName = profiles[selectedIndex].name
             lastErrorMessage = nil
             await persistProfiles()
+            await refreshDiskSyncState()
             return true
         } catch {
             lastErrorMessage = error.localizedDescription

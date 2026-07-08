@@ -58,6 +58,7 @@
 "profile.status.modified" = "未应用修改";
 "profile.status.active" = "当前生效";
 "profile.status.ready" = "可应用";
+"profile.status.external" = "外部改动";
 "sidebar.removeFromListTitle" = "从列表移除？";
 "sidebar.removeFromListMessage" = "将从侧边栏移除此文件，但不会删除实际文件。\n%@";
 "sidebar.remove" = "移除";
@@ -78,6 +79,7 @@
 "sidebar.unapplied" = "未应用";
 "sidebar.applied" = "已应用";
 "sidebar.draft" = "草稿";
+"sidebar.external" = "外部改动";
 "sidebar.create" = "创建";
 "sidebar.addFilePanel.title" = "添加文件";
 "sidebar.addFilePanel.message" = "选择要添加到此分类的文件";

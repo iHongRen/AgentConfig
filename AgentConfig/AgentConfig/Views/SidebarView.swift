@@ -309,7 +309,7 @@ struct SidebarView: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
-                    Text(profileStatusText(profile))
+                    Text(profileStatusText(profile, isOutOfSync: profile.isActive && codexProfileViewModel.isDiskOutOfSync))
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -318,7 +318,7 @@ struct SidebarView: View {
                 Spacer(minLength: 4)
 
                 Circle()
-                    .fill(profileStateColor(profile))
+                    .fill(profileStateColor(profile, isOutOfSync: profile.isActive && codexProfileViewModel.isDiskOutOfSync))
                     .frame(width: 8, height: 8)
             }
             .padding(.leading, 34)
@@ -368,7 +368,7 @@ struct SidebarView: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
-                    Text(claudeProfileStatusText(profile))
+                    Text(claudeProfileStatusText(profile, isOutOfSync: profile.isActive && claudeProfileViewModel.isDiskOutOfSync))
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -377,7 +377,7 @@ struct SidebarView: View {
                 Spacer(minLength: 4)
 
                 Circle()
-                    .fill(claudeProfileStateColor(profile))
+                    .fill(claudeProfileStateColor(profile, isOutOfSync: profile.isActive && claudeProfileViewModel.isDiskOutOfSync))
                     .frame(width: 8, height: 8)
             }
             .padding(.leading, 34)
@@ -484,26 +484,30 @@ struct SidebarView: View {
         }
     }
 
-    private func profileStatusText(_ profile: CodexProfile) -> String {
+    private func profileStatusText(_ profile: CodexProfile, isOutOfSync: Bool) -> String {
         if profile.isDirty { return L10n.tr("sidebar.unapplied", value: "Unapplied") }
+        if isOutOfSync { return L10n.tr("sidebar.external", value: "External") }
         if profile.isActive { return L10n.tr("sidebar.applied", value: "Applied") }
         return L10n.tr("sidebar.draft", value: "Draft")
     }
 
-    private func profileStateColor(_ profile: CodexProfile) -> Color {
+    private func profileStateColor(_ profile: CodexProfile, isOutOfSync: Bool) -> Color {
         if profile.isDirty { return .orange }
+        if isOutOfSync { return .red }
         if profile.isActive { return .green }
         return Color(nsColor: .tertiaryLabelColor)
     }
 
-    private func claudeProfileStatusText(_ profile: ClaudeProfile) -> String {
+    private func claudeProfileStatusText(_ profile: ClaudeProfile, isOutOfSync: Bool) -> String {
         if profile.isDirty { return L10n.tr("sidebar.unapplied", value: "Unapplied") }
+        if isOutOfSync { return L10n.tr("sidebar.external", value: "External") }
         if profile.isActive { return L10n.tr("sidebar.applied", value: "Applied") }
         return L10n.tr("sidebar.draft", value: "Draft")
     }
 
-    private func claudeProfileStateColor(_ profile: ClaudeProfile) -> Color {
+    private func claudeProfileStateColor(_ profile: ClaudeProfile, isOutOfSync: Bool) -> Color {
         if profile.isDirty { return .orange }
+        if isOutOfSync { return .red }
         if profile.isActive { return .green }
         return Color(nsColor: .tertiaryLabelColor)
     }
