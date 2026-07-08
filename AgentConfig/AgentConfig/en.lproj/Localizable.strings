@@ -94,6 +94,9 @@
 "error.fileReadFailed" = "Failed to read file \"%@\": %@";
 "error.fileWriteFailed" = "Failed to write file \"%@\": %@";
 "error.jsonFormatError" = "JSON format error at line %d, column %d: %@";
+"error.syntaxBalanceError" = "%@ syntax error: %@";
 "error.fileReadFailed.recovery" = "Check file permissions and try again.";
 "error.fileWriteFailed.recovery" = "Check file permissions and available disk space.";
 "error.jsonFormatError.recovery" = "Fix the JSON syntax error and try formatting again.";
+"error.syntaxBalanceError.recovery" = "Check for unbalanced brackets or quotes and try again.";
+"error.syntaxBalanceError.unbalanced" = "Unbalanced bracket or quote.";

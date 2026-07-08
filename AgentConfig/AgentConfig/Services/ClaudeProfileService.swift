@@ -13,15 +13,10 @@ protocol ClaudeProfileServiceProtocol {
 
 final class ClaudeProfileService: ClaudeProfileServiceProtocol {
 
-    private let fileManager: FileManager
-    private let encoder: JSONEncoder
-    private let decoder: JSONDecoder
+    private let fileService: ProfileFileService
 
     init(fileManager: FileManager = .default) {
-        self.fileManager = fileManager
-        self.encoder = JSONEncoder()
-        self.decoder = JSONDecoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        self.fileService = ProfileFileService(fileManager: fileManager)
     }
 
     func loadProfiles() async throws -> [ClaudeProfile] {
@@ -35,22 +30,23 @@ final class ClaudeProfileService: ClaudeProfileServiceProtocol {
     }
 
     func saveProfiles(_ profiles: [ClaudeProfile]) async throws {
-        try ensureParentDirectory(for: storageURL)
-        let data = try encoder.encode(profiles)
-        try data.write(to: storageURL, options: .atomic)
+        try fileService.write(encode(profiles), to: storageURL)
     }
 
     func apply(profile: ClaudeProfile) async throws {
-        try write(profile.settingsText, to: claudeSettingsURL)
         let mergedClaudeState = try mergedClaudeState(with: profile.claudeJSONText)
-        try write(mergedClaudeState, to: claudeStateURL)
-        try applyManagedZshrcBlock(profile.zshrcText)
+        let zshrcTarget = fileService.computedZshrcWithBlock(profile.zshrcText, blockID: "Claude Profile")
+        try fileService.performWrites([
+            (claudeSettingsURL, profile.settingsText),
+            (claudeStateURL, mergedClaudeState),
+            (fileService.zshrcURL, zshrcTarget)
+        ])
     }
 
     private func defaultProfile() -> ClaudeProfile {
-        let settingsText = (try? readFileIfExists(at: claudeSettingsURL)) ?? "{}"
+        let settingsText = fileService.readIfExists(at: claudeSettingsURL) ?? "{}"
         let claudeJSONText = ClaudeProfile.defaultClaudeJSONText
-        let zshrcText = defaultManagedZshrcBlockContent()
+        let zshrcText = fileService.extractManagedZshrcBlock(blockID: "Claude Profile") ?? ClaudeProfile.defaultZshrcText
         return ClaudeProfile(
             name: L10n.tr("profile.newName", value: "New Profile"),
             settingsText: settingsText,
@@ -81,35 +77,26 @@ final class ClaudeProfileService: ClaudeProfileServiceProtocol {
         fileManager.homeDirectoryForCurrentUser.appendingPathComponent(".claude.json")
     }
 
-    private var zshrcURL: URL {
-        fileManager.homeDirectoryForCurrentUser.appendingPathComponent(".zshrc")
-    }
+    private var fileManager: FileManager { fileService.fileManager }
 
-    private func readFileIfExists(at url: URL) throws -> String {
-        guard fileManager.fileExists(atPath: url.path) else {
-            throw CocoaError(.fileNoSuchFile)
+    private let encoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return encoder
+    }()
+
+    private let decoder: JSONDecoder = JSONDecoder()
+
+    private func encode(_ profiles: [ClaudeProfile]) throws -> String {
+        let data = try encoder.encode(profiles)
+        guard let text = String(data: data, encoding: .utf8) else {
+            throw CocoaError(.fileWriteUnknown)
         }
-        return try String(contentsOf: url, encoding: .utf8)
-    }
-
-    private func write(_ content: String, to url: URL) throws {
-        try ensureParentDirectory(for: url)
-        try normalized(content).write(to: url, atomically: true, encoding: .utf8)
-    }
-
-    private func ensureParentDirectory(for url: URL) throws {
-        let parent = url.deletingLastPathComponent()
-        if !fileManager.fileExists(atPath: parent.path) {
-            try fileManager.createDirectory(at: parent, withIntermediateDirectories: true)
-        }
-    }
-
-    private func normalized(_ content: String) -> String {
-        content.hasSuffix("\n") ? String(content.dropLast()) : content
+        return text
     }
 
     private func mergedClaudeState(with profileText: String) throws -> String {
-        let currentStateText = (try? readFileIfExists(at: claudeStateURL)) ?? ClaudeProfile.defaultClaudeJSONText
+        let currentStateText = fileService.readIfExists(at: claudeStateURL) ?? ClaudeProfile.defaultClaudeJSONText
         let currentObject = try parseJSONObject(from: currentStateText)
         let profileObject = try parseJSONObject(from: profileText)
         let mergedObject = deepMerge(currentObject, with: profileObject)
@@ -117,7 +104,7 @@ final class ClaudeProfileService: ClaudeProfileServiceProtocol {
     }
 
     private func parseJSONObject(from text: String) throws -> [String: Any] {
-        let normalizedText = normalized(text).trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let fallbackText = ClaudeProfile.defaultClaudeJSONText
         let sourceText = normalizedText.isEmpty ? fallbackText : normalizedText
 
@@ -152,47 +139,5 @@ final class ClaudeProfileService: ClaudeProfileServiceProtocol {
         }
 
         return merged
-    }
-
-    private func defaultManagedZshrcBlockContent() -> String {
-        let current = (try? String(contentsOf: zshrcURL, encoding: .utf8)) ?? ""
-        return extractManagedZshrcBlock(from: current) ?? ClaudeProfile.defaultZshrcText
-    }
-
-    private func applyManagedZshrcBlock(_ content: String) throws {
-        let begin = "# AgentConfig Claude Profile BEGIN"
-        let end = "# AgentConfig Claude Profile END"
-        let managedBlock = [begin, normalized(content), end].joined(separator: "\n")
-        let current = (try? String(contentsOf: zshrcURL, encoding: .utf8)) ?? ""
-
-        let updated: String
-        if let beginRange = current.range(of: begin),
-           let endRange = current.range(of: end, range: beginRange.upperBound..<current.endIndex) {
-            updated = String(current[..<beginRange.lowerBound])
-                + managedBlock
-                + String(current[endRange.upperBound...])
-        } else if current.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            updated = managedBlock + "\n"
-        } else {
-            updated = normalized(current) + "\n\n" + managedBlock + "\n"
-        }
-
-        try write(updated, to: zshrcURL)
-    }
-
-    private func extractManagedZshrcBlock(from content: String) -> String? {
-        let begin = "# AgentConfig Claude Profile BEGIN"
-        let end = "# AgentConfig Claude Profile END"
-
-        guard let beginRange = content.range(of: begin),
-              let endRange = content.range(of: end, range: beginRange.upperBound..<content.endIndex) else {
-            return nil
-        }
-
-        let body = content[beginRange.upperBound..<endRange.lowerBound]
-        return body
-            .trimmingCharacters(in: CharacterSet(charactersIn: "\n"))
-            .replacingOccurrences(of: "\r\n", with: "\n")
-            .replacingOccurrences(of: "\r", with: "\n")
     }
 }

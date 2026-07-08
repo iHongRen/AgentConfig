@@ -94,6 +94,9 @@
 "error.fileReadFailed" = "读取文件“%@”失败：%@";
 "error.fileWriteFailed" = "写入文件“%@”失败：%@";
 "error.jsonFormatError" = "JSON 格式错误，位于第 %d 行第 %d 列：%@";
+"error.syntaxBalanceError" = "%@ 语法错误：%@";
 "error.fileReadFailed.recovery" = "请检查文件权限后重试。";
 "error.fileWriteFailed.recovery" = "请检查文件权限和磁盘可用空间。";
 "error.jsonFormatError.recovery" = "请修复 JSON 语法错误后重试格式化。";
+"error.syntaxBalanceError.recovery" = "请检查括号或引号是否配对后再重试。";
+"error.syntaxBalanceError.unbalanced" = "括号或引号未配对。";

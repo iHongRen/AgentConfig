@@ -20,6 +20,9 @@ enum AppError: LocalizedError {
     /// JSON 格式化错误，包含行列位置信息
     case jsonFormatError(line: Int, column: Int, message: String)
 
+    /// 括号/引号不平衡等基础语法校验失败（TOML/JSON5 等无原生解析器的类型）
+    case syntaxBalanceError(fileType: String, message: String)
+
     // MARK: - LocalizedError
 
     var errorDescription: String? {
@@ -48,6 +51,14 @@ enum AppError: LocalizedError {
                 column,
                 message
             )
+
+        case .syntaxBalanceError(let fileType, let message):
+            return L10n.format(
+                "error.syntaxBalanceError",
+                value: "%@ syntax error: %@",
+                fileType,
+                message
+            )
         }
     }
 
@@ -58,6 +69,8 @@ enum AppError: LocalizedError {
         case .fileWriteFailed(_, let error):
             return error.localizedDescription
         case .jsonFormatError(_, _, let message):
+            return message
+        case .syntaxBalanceError(_, let message):
             return message
         }
     }
@@ -70,6 +83,8 @@ enum AppError: LocalizedError {
             return L10n.tr("error.fileWriteFailed.recovery", value: "Check file permissions and available disk space.")
         case .jsonFormatError:
             return L10n.tr("error.jsonFormatError.recovery", value: "Fix the JSON syntax error and try formatting again.")
+        case .syntaxBalanceError:
+            return L10n.tr("error.syntaxBalanceError.recovery", value: "Check for unbalanced brackets or quotes and try again.")
         }
     }
 }

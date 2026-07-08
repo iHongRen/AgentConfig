@@ -30,10 +30,10 @@ final class EditorViewModel: ObservableObject {
     @Published var content: String = "" {
         didSet {
             guard content != oldValue else { return }
-            // 追踪修改状态
+            // 非加载状态下，依据与磁盘加载内容的差异判定修改状态。
+            // 撤销/重做回到原始内容时 isModified 会自动归 false（走 NSTextView 原生 undo）。
             if !isLoadingContent {
-                isModified = true
-                registerUndo(oldContent: oldValue)
+                isModified = content != loadedContent
             }
         }
     }
@@ -67,6 +67,9 @@ final class EditorViewModel: ObservableObject {
     /// 当前打开的文件
     private(set) var currentFile: ConfigFile?
 
+    /// 最后一次从磁盘加载（或静默刷新）得到的纯净内容快照，用于判定 isModified
+    private var loadedContent: String = ""
+
     /// 最后一次加载文件的时间，用于 onForeground() 比较
     private(set) var lastLoadedDate: Date?
 
@@ -77,16 +80,10 @@ final class EditorViewModel: ObservableObject {
 
     // MARK: - Undo/Redo
 
-    /// 撤销栈，存储历史内容快照
-    private var undoStack: [String] = []
+    /// 撤销/重做由 NSTextView 原生 undoManager 处理（CommentingTextView.allowsUndo = true）。
+    /// 此处不再维护自定义栈，避免与系统 Cmd+Z 历史冲突。
 
-    /// 重做栈，存储被撤销的内容快照
-    private var redoStack: [String] = []
-
-    /// 撤销/重做历史最大步数
-    private let maxUndoSteps = 100
-
-    /// 标记是否正在加载内容（加载时不触发 isModified 和 undo 注册）
+    /// 标记是否正在加载内容（加载时不触发 isModified 判定）
     private var isLoadingContent: Bool = false
 
     /// 用户确认后要执行的切换目标
@@ -128,12 +125,10 @@ final class EditorViewModel: ObservableObject {
             content = fileContent
             isLoadingContent = false
             currentFile = file
+            loadedContent = fileContent
             isModified = false
             lastLoadedDate = fileService.modificationDate(of: file.url) ?? Date()
             hasExternalConflict = false
-            // 重置撤销/重做历史
-            undoStack = []
-            redoStack = []
             // 清空搜索状态
             searchResults = []
             currentSearchIndex = 0
@@ -169,10 +164,17 @@ final class EditorViewModel: ObservableObject {
             try validateSyntaxBeforeSaving()
             // 先写入文件
             try await fileService.write(content: content, to: file.url)
-            // 写入成功后标记为未修改
-            isModified = false
-            hasExternalConflict = false
             lastLoadedDate = fileService.modificationDate(of: file.url) ?? Date()
+            // 写后重读磁盘内容，校正 loadedContent 基准；若保存瞬间被外部进程覆盖，
+            // 则以此为基准重新判定修改状态（避免同秒内的写+外部改被漏判）。
+            if let fresh = try? await fileService.read(url: file.url) {
+                loadedContent = fresh
+                isModified = content != loadedContent
+            } else {
+                loadedContent = content
+                isModified = false
+            }
+            hasExternalConflict = false
         } catch let appError as AppError {
             lastError = appError
             throw appError
@@ -208,6 +210,7 @@ final class EditorViewModel: ObservableObject {
         isLoadingContent = true
         content = newContent
         isLoadingContent = false
+        loadedContent = newContent
         isModified = false
         lastLoadedDate = fileService.modificationDate(of: file.url) ?? Date()
     }
@@ -246,7 +249,6 @@ final class EditorViewModel: ObservableObject {
             // 加载外部版本
             if let file = currentFile {
                 await silentRefresh(file: file)
-                isModified = false
             }
         }
     }
@@ -285,32 +287,6 @@ final class EditorViewModel: ObservableObject {
     func cancelPendingNavigation() {
         pendingNavigationTarget = nil
         hasPendingUnsavedChangesConfirmation = false
-    }
-
-    // MARK: - Undo / Redo
-
-    /// 撤销上一步内容变更
-    func undo() {
-        guard let previousContent = undoStack.popLast() else { return }
-        // 将当前内容压入重做栈
-        redoStack.append(content)
-        // 恢复内容（不触发 undo 注册）
-        isLoadingContent = true
-        content = previousContent
-        isLoadingContent = false
-        isModified = !undoStack.isEmpty || content != (currentFile.map { _ in "" } ?? "")
-    }
-
-    /// 重做上一步被撤销的内容变更
-    func redo() {
-        guard let nextContent = redoStack.popLast() else { return }
-        // 将当前内容压入撤销栈
-        undoStack.append(content)
-        // 应用内容（不触发 undo 注册）
-        isLoadingContent = true
-        content = nextContent
-        isLoadingContent = false
-        isModified = true
     }
 
     // MARK: - Search
@@ -414,8 +390,58 @@ final class EditorViewModel: ObservableObject {
             try validateStrictJSON(content)
         case .jsonl:
             try validateJSONLines(content)
-        case .jsonc, .json5, .yaml, .toml, .shell, .plainText:
+        case .toml, .json5:
+            try validateBracketBalance(content, fileType: fileType.displayName)
+        case .jsonc, .yaml, .shell, .plainText:
             return
+        }
+    }
+
+    /// 轻量基础校验：括号 `() [] {}` 与引号 `"` `'` 是否配对。
+    /// 适用于无原生解析器的 TOML/JSON5，避免误报故仅在字符串字面量外判定括号。
+    private func validateBracketBalance(_ content: String, fileType: String) throws {
+        var stack: [Character] = []
+        var quote: Character? = nil
+        let opening: [Character: Character] = ["(": ")", "[": "]", "{": "}"]
+        let closing: Set<Character> = [")", "]", "}"]
+        let chars = Array(content)
+
+        for char in chars {
+            if let currentQuote = quote {
+                if char == currentQuote {
+                    quote = nil
+                }
+                continue
+            }
+
+            if char == "\"" || char == "'" {
+                quote = char
+                continue
+            }
+
+            if let match = opening[char] {
+                stack.append(match)
+            } else if closing.contains(char) {
+                guard let expected = stack.popLast(), expected == char else {
+                    throw AppError.syntaxBalanceError(
+                        fileType: fileType,
+                        message: L10n.tr("error.syntaxBalanceError.unbalanced", value: "Unbalanced bracket or quote.")
+                    )
+                }
+            }
+        }
+
+        if quote != nil {
+            throw AppError.syntaxBalanceError(
+                fileType: fileType,
+                message: L10n.tr("error.syntaxBalanceError.unbalanced", value: "Unbalanced bracket or quote.")
+            )
+        }
+        if !stack.isEmpty {
+            throw AppError.syntaxBalanceError(
+                fileType: fileType,
+                message: L10n.tr("error.syntaxBalanceError.unbalanced", value: "Unbalanced bracket or quote.")
+            )
         }
     }
 
@@ -447,28 +473,14 @@ final class EditorViewModel: ObservableObject {
         }
     }
 
-    /// 注册撤销操作，将旧内容压入撤销栈
-    private func registerUndo(oldContent: String) {
-        undoStack.append(oldContent)
-        // 超出最大步数时移除最旧的记录
-        if undoStack.count > maxUndoSteps {
-            undoStack.removeFirst()
-        }
-        // 内容变更后清空重做栈
-        redoStack = []
-    }
-
     /// 从 NSError 中提取 JSON 错误的行列信息
     private func extractJSONErrorInfo(from error: NSError, originalContent: String) -> (line: Int, column: Int, message: String) {
-        // JSONSerialization 错误通常在 userInfo 中包含行列信息
-        let line = (error.userInfo["NSJSONSerializationErrorIndex"] as? Int).flatMap { charIndex in
+        // JSONSerialization 错误通常在 userInfo 中包含字符偏移量
+        let location = (error.userInfo["NSJSONSerializationErrorIndex"] as? Int).flatMap { charIndex in
             lineAndColumn(for: charIndex, in: originalContent)
-        }?.line ?? 1
-
-        let column = (error.userInfo["NSJSONSerializationErrorIndex"] as? Int).flatMap { charIndex in
-            lineAndColumn(for: charIndex, in: originalContent)
-        }?.column ?? 1
-
+        }
+        let line = location?.line ?? 1
+        let column = location?.column ?? 1
         let message = error.localizedDescription
 
         return (line, column, message)

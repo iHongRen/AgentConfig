@@ -13,15 +13,10 @@ protocol CodexProfileServiceProtocol {
 
 final class CodexProfileService: CodexProfileServiceProtocol {
 
-    private let fileManager: FileManager
-    private let encoder: JSONEncoder
-    private let decoder: JSONDecoder
+    private let fileService: ProfileFileService
 
     init(fileManager: FileManager = .default) {
-        self.fileManager = fileManager
-        self.encoder = JSONEncoder()
-        self.decoder = JSONDecoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        self.fileService = ProfileFileService(fileManager: fileManager)
     }
 
     func loadProfiles() async throws -> [CodexProfile] {
@@ -35,15 +30,16 @@ final class CodexProfileService: CodexProfileServiceProtocol {
     }
 
     func saveProfiles(_ profiles: [CodexProfile]) async throws {
-        try ensureParentDirectory(for: storageURL)
-        let data = try encoder.encode(profiles)
-        try data.write(to: storageURL, options: .atomic)
+        try fileService.write(encode(profiles), to: storageURL)
     }
 
     func apply(profile: CodexProfile) async throws {
-        try write(profile.configText, to: codexConfigURL)
-        try write(profile.authText, to: codexAuthURL)
-        try applyManagedZshrcBlock(profile.zshrcText)
+        let zshrcTarget = fileService.computedZshrcWithBlock(profile.zshrcText, blockID: "Codex Profile")
+        try fileService.performWrites([
+            (codexConfigURL, profile.configText),
+            (codexAuthURL, profile.authText),
+            (fileService.zshrcURL, zshrcTarget)
+        ])
     }
 
     private var storageURL: URL {
@@ -66,44 +62,21 @@ final class CodexProfileService: CodexProfileServiceProtocol {
             .appendingPathComponent("auth.json")
     }
 
-    private var zshrcURL: URL {
-        fileManager.homeDirectoryForCurrentUser.appendingPathComponent(".zshrc")
-    }
+    private var fileManager: FileManager { fileService.fileManager }
 
-    private func write(_ content: String, to url: URL) throws {
-        try ensureParentDirectory(for: url)
-        try normalized(content).write(to: url, atomically: true, encoding: .utf8)
-    }
+    private let encoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return encoder
+    }()
 
-    private func ensureParentDirectory(for url: URL) throws {
-        let parent = url.deletingLastPathComponent()
-        if !fileManager.fileExists(atPath: parent.path) {
-            try fileManager.createDirectory(at: parent, withIntermediateDirectories: true)
+    private let decoder: JSONDecoder = JSONDecoder()
+
+    private func encode(_ profiles: [CodexProfile]) throws -> String {
+        let data = try encoder.encode(profiles)
+        guard let text = String(data: data, encoding: .utf8) else {
+            throw CocoaError(.fileWriteUnknown)
         }
-    }
-
-    private func applyManagedZshrcBlock(_ content: String) throws {
-        let begin = "# AgentConfig Codex Profile BEGIN"
-        let end = "# AgentConfig Codex Profile END"
-        let managedBlock = [begin, normalized(content), end].joined(separator: "\n")
-        let current = (try? String(contentsOf: zshrcURL, encoding: .utf8)) ?? ""
-
-        let updated: String
-        if let beginRange = current.range(of: begin),
-           let endRange = current.range(of: end, range: beginRange.upperBound..<current.endIndex) {
-            updated = String(current[..<beginRange.lowerBound])
-                + managedBlock
-                + String(current[endRange.upperBound...])
-        } else if current.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            updated = managedBlock + "\n"
-        } else {
-            updated = normalized(current) + "\n\n" + managedBlock + "\n"
-        }
-
-        try write(updated, to: zshrcURL)
-    }
-
-    private func normalized(_ content: String) -> String {
-        content.hasSuffix("\n") ? String(content.dropLast()) : content
+        return text
     }
 }
