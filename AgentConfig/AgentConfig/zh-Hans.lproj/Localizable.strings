@@ -40,6 +40,7 @@
 "profile.copy" = "复制";
 "profile.copyHelp" = "复制";
 "profile.copyToast" = "已复制当前配置片段";
+"profile.formatJSONHelp" = "以 2 空格缩进格式化 JSON";
 "profile.lineCount" = "%d 行";
 "profile.empty" = "选择左侧配置";
 "profile.help" = "文件说明";

@@ -138,7 +138,7 @@ struct EditorToolbarView: View {
 
     /// 格式化按钮
     private var formatButton: some View {
-        toolbarIconButton(systemName: "text.alignleft", isActive: false) {
+        toolbarIconButton(systemName: "curlybraces", isActive: false) {
             performFormat()
         }
         .help(L10n.tr("toolbar.format.help", value: "Format JSON with 4-space indentation"))

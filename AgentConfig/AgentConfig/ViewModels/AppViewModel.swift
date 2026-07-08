@@ -137,6 +137,57 @@ final class AppViewModel: ObservableObject {
         settings.save()
     }
 
+    /// 同步指定文件的未保存修改状态到侧边栏列表（用于刷新指示点）
+    /// - Parameters:
+    ///   - url: 文件 URL
+    ///   - modified: 是否存在未保存修改
+    func setFileModified(_ url: URL, _ modified: Bool) {
+        let standardizedURL = url.standardizedFileURL
+        var didChange = false
+
+        if let envCategory {
+            let updatedFiles = envCategory.files.map { file -> ConfigFile in
+                guard file.url.standardizedFileURL == standardizedURL, file.isModified != modified else { return file }
+                didChange = true
+                var updated = file
+                updated.isModified = modified
+                return updated
+            }
+            if didChange { self.envCategory = EnvCategory(files: updatedFiles, missingPaths: envCategory.missingPaths) }
+        }
+
+        var updatedAgentCategories = agentCategories
+        for index in updatedAgentCategories.indices {
+            let updatedFiles = updatedAgentCategories[index].files.map { file -> ConfigFile in
+                guard file.url.standardizedFileURL == standardizedURL, file.isModified != modified else { return file }
+                didChange = true
+                var updated = file
+                updated.isModified = modified
+                return updated
+            }
+            updatedAgentCategories[index] = AgentCategory(
+                id: updatedAgentCategories[index].id,
+                displayName: updatedAgentCategories[index].displayName,
+                files: updatedFiles,
+                missingPaths: updatedAgentCategories[index].missingPaths
+            )
+        }
+        if didChange { agentCategories = updatedAgentCategories }
+
+        var updatedGroups = customPathGroups
+        for index in updatedGroups.indices {
+            let updatedFiles = updatedGroups[index].files.map { file -> ConfigFile in
+                guard file.url.standardizedFileURL == standardizedURL, file.isModified != modified else { return file }
+                didChange = true
+                var updated = file
+                updated.isModified = modified
+                return updated
+            }
+            updatedGroups[index] = CustomPathGroup(url: updatedGroups[index].url, files: updatedFiles)
+        }
+        if didChange { customPathGroups = updatedGroups }
+    }
+
     func moveAgentCategory(from sourceID: String, to destinationID: String?) {
         let currentIDs = agentCategories.map(\.id)
         guard let sourceIndex = currentIDs.firstIndex(of: sourceID) else { return }

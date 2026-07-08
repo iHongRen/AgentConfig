@@ -39,7 +39,17 @@ final class EditorViewModel: ObservableObject {
     }
 
     /// 内容是否已被修改但未保存
-    @Published var isModified: Bool = false
+    @Published var isModified: Bool = false {
+        didSet {
+            guard isModified != oldValue else { return }
+            if let url = currentFile?.url {
+                onModifiedChange?(url, isModified)
+            }
+        }
+    }
+
+    /// 修改状态变化回调，用于同步到 AppViewModel 侧边栏的 ConfigFile 指示点
+    var onModifiedChange: ((URL, Bool) -> Void)?
 
     /// 当前搜索关键词
     @Published var searchQuery: String = ""
@@ -120,6 +130,10 @@ final class EditorViewModel: ObservableObject {
     /// - Throws: `AppError.fileReadFailed` 读取失败时
     func load(file: ConfigFile) async throws {
         do {
+            // 加载新文件前，先清除上一个文件的未保存指示点（currentFile 尚未被覆盖）
+            if isModified, let previousURL = currentFile?.url {
+                onModifiedChange?(previousURL, false)
+            }
             let fileContent = try await fileService.read(url: file.url)
             isLoadingContent = true
             content = fileContent

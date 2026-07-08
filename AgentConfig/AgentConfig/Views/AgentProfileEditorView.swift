@@ -11,7 +11,7 @@ struct AgentProfileEditorView: View {
     let profile: AgentProfileEditorProfile?
 
     @Environment(\.colorScheme) private var colorScheme
-    @FocusState private var isNameFieldFocused: Bool
+    @State private var isNameFieldFocused: Bool = false
 
     @State private var toastMessage: String?
     @State private var toastTask: Task<Void, Never>?
@@ -96,26 +96,22 @@ struct AgentProfileEditorView: View {
                 isNameFieldFocused = true
             } label: {
                 HStack(spacing: 0) {
-                    TextField(L10n.tr("profile.namePlaceholder", value: "Profile Name"), text: $editingProfileName)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13, weight: .semibold))
-                        .focused($isNameFieldFocused)
-                        .frame(width: profileNameFieldWidth(for: editingProfileName), alignment: .leading)
-                        .onChange(of: editingProfileName) { _, newValue in
-                            let truncated = String(newValue.prefix(profile.nameMaxLength))
-                            if truncated != newValue {
-                                editingProfileName = truncated
-                            }
-                            profile.updateName(truncated)
+                    ProfileNameField(
+                        text: $editingProfileName,
+                        isFocused: $isNameFieldFocused,
+                        maxLength: profile.nameMaxLength,
+                        placeholder: L10n.tr("profile.namePlaceholder", value: "Profile Name")
+                    ) { truncated in
+                        profile.updateName(truncated)
+                    } onSubmit: {
+                        let truncated = String(editingProfileName.prefix(profile.nameMaxLength))
+                        if truncated != editingProfileName {
+                            editingProfileName = truncated
                         }
-                        .onSubmit {
-                            let truncated = String(editingProfileName.prefix(profile.nameMaxLength))
-                            if truncated != editingProfileName {
-                                editingProfileName = truncated
-                            }
-                            profile.updateName(truncated)
-                            dismissAllInputsFocus()
-                        }
+                        profile.updateName(truncated)
+                        dismissAllInputsFocus()
+                    }
+                    .frame(width: profileNameFieldWidth(for: editingProfileName), alignment: .leading)
 
                     if !isNameFieldFocused {
                         Image(systemName: "square.and.pencil")
@@ -231,26 +227,30 @@ struct AgentProfileEditorView: View {
 
                 Spacer(minLength: 8)
 
-                Button(L10n.tr("profile.copy", value: "Copy")) {
+                Button {
                     if !field.text.wrappedValue.isEmpty {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(field.text.wrappedValue, forType: .string)
                         showToast(L10n.tr("profile.copyToast", value: "Copied current configuration snippet"))
                     }
+                } label: {
+                    Image(systemName: "clipboard")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color(red: 0.6, green: 0.6, blue: 0.6))
+                        .frame(width: 24, height: 24)
                 }
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Color(red: 0.6, green: 0.6, blue: 0.6))
-                .frame(height: 24)
                 .buttonStyle(.plain)
                 .help(L10n.tr("profile.copyHelp", value: "Copy"))
 
                 if field.supportsFormatting {
-                    Button(L10n.tr("profile.format", value: "Format")) {
+                    Button {
                         format(field: field)
+                    } label: {
+                        Image(systemName: "curlybraces")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color(red: 0.6, green: 0.6, blue: 0.6))
+                            .frame(width: 24, height: 24)
                     }
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(field.accentColor)
-                    .frame(height: 24)
                     .buttonStyle(.plain)
                     .help(L10n.tr("profile.formatJSONHelp", value: "Format JSON with 2-space indentation"))
                 }
@@ -493,5 +493,83 @@ struct AgentProfileEditorActionResult {
 
     static func failure(_ message: String) -> AgentProfileEditorActionResult {
         AgentProfileEditorActionResult(isSuccess: false, message: message)
+    }
+}
+
+private final class ProfileNameNSTextField: NSTextField {
+    override func becomeFirstResponder() -> Bool {
+        let ok = super.becomeFirstResponder()
+        if ok, let editor = currentEditor() as? NSTextView {
+            let end = NSMakeRange((stringValue as NSString).length, 0)
+            editor.setSelectedRange(end)
+        }
+        return ok
+    }
+}
+
+private struct ProfileNameField: NSViewRepresentable {
+    @Binding var text: String
+    @Binding var isFocused: Bool
+    let maxLength: Int
+    let placeholder: String
+    let onChange: (String) -> Void
+    let onSubmit: () -> Void
+
+    func makeNSView(context: Context) -> ProfileNameNSTextField {
+        let tf = ProfileNameNSTextField()
+        tf.delegate = context.coordinator
+        tf.isBezeled = false
+        tf.drawsBackground = false
+        tf.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+        tf.alignment = .left
+        tf.usesSingleLineMode = true
+        tf.cell?.wraps = false
+        tf.cell?.isScrollable = true
+        tf.placeholderString = placeholder
+        tf.focusRingType = .none
+        tf.target = context.coordinator
+        tf.action = #selector(Coordinator.commit(_:))
+        return tf
+    }
+
+    func updateNSView(_ nsView: ProfileNameNSTextField, context: Context) {
+        if nsView.stringValue != text {
+            nsView.stringValue = text
+        }
+        context.coordinator.parent = self
+        if isFocused, nsView.window?.firstResponder != nsView.currentEditor() {
+            nsView.window?.makeFirstResponder(nsView)
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: ProfileNameField
+
+        init(_ parent: ProfileNameField) {
+            self.parent = parent
+        }
+
+        func controlTextDidChange(_ obj: Notification) {
+            guard let tf = obj.object as? NSTextField else { return }
+            var value = tf.stringValue
+            if value.count > parent.maxLength {
+                value = String(value.prefix(parent.maxLength))
+                tf.stringValue = value
+            }
+            parent.text = value
+            parent.onChange(value)
+        }
+
+        func controlTextDidEndEditing(_ obj: Notification) {
+            parent.isFocused = false
+        }
+
+        @objc func commit(_ sender: Any?) {
+            parent.onSubmit()
+        }
     }
 }

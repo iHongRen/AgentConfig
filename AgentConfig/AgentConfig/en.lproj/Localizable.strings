@@ -40,6 +40,7 @@
 "profile.copy" = "Copy";
 "profile.copyHelp" = "Copy";
 "profile.copyToast" = "Copied current configuration snippet";
+"profile.formatJSONHelp" = "Format JSON with 2-space indentation";
 "profile.lineCount" = "%d lines";
 "profile.empty" = "Select a profile";
 "profile.help" = "File Help";

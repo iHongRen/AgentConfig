@@ -236,6 +236,11 @@ struct MainContentView: View {
                     saveCoordinator: saveCoordinator,
                     onConfirmNavigation: handleNavigation
                 )
+                .onAppear {
+                    editorViewModel.onModifiedChange = { [weak appViewModel] url, modified in
+                        appViewModel?.setFileModified(url, modified)
+                    }
+                }
             }
         }
         .frame(minWidth: 600, minHeight: 640)
