@@ -48,23 +48,22 @@ struct SidebarView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 6) {
-                    if let envCategory = appViewModel.envCategory {
-                        envSection(envCategory)
-                        Divider()
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                    }
-
-                    agentSections
+        ScrollView {
+            VStack(alignment: .leading, spacing: 6) {
+                if let envCategory = appViewModel.envCategory {
+                    envSection(envCategory)
+                    Divider()
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
                 }
-                .padding(.horizontal, 10)
-                .padding(.top, 18)
-                .padding(.bottom, 16)
-                .coordinateSpace(name: CoordinateSpace.sidebar)
+
+                agentSections
             }
+            .padding(.horizontal, 10)
+            .padding(.top, 18)
+            .padding(.bottom, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .coordinateSpace(name: CoordinateSpace.sidebar)
         }
         .background(Color.agentSidebarBackground)
         .navigationSplitViewColumnWidth(min: 280, ideal: 280, max: 320)
