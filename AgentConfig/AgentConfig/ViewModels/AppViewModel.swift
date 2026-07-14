@@ -57,6 +57,9 @@ final class AppViewModel: ObservableObject {
     private(set) var settings: AppSettings
     private var hasRestoredInitialSelection = false
 
+    /// 最近选中的配置文件历史（标准化 URL，最近一次在末尾），用于在删除当前文件后回退到最近的配置
+    private var recentlySelectedURLs: [URL] = []
+
     var lastVisitedPage: LastVisitedPage? {
         settings.lastVisitedPage
     }
@@ -102,13 +105,19 @@ final class AppViewModel: ObservableObject {
     }
 
     func selectFile(_ file: ConfigFile?) {
-        selectedFile = file
-
         if let file {
-            persistLastVisitedPage(.configFile(path: file.url.standardizedFileURL.path))
+            let url = file.url.standardizedFileURL
+            recentlySelectedURLs.removeAll { $0 == url }
+            recentlySelectedURLs.append(url)
+            if recentlySelectedURLs.count > 20 {
+                recentlySelectedURLs.removeFirst()
+            }
+            persistLastVisitedPage(.configFile(path: url.path))
         } else if case .configFile = settings.lastVisitedPage {
             persistLastVisitedPage(nil)
         }
+
+        selectedFile = file
     }
 
     func restoreInitialSelectionIfNeeded() -> ConfigFile? {
@@ -221,7 +230,21 @@ final class AppViewModel: ObservableObject {
             urlsToAdd.contains { $0.standardizedFileURL == hiddenURL.standardizedFileURL }
         }
         settings.save()
-        Task { await refresh() }
+        Task {
+            await refresh()
+            // 添加完成后选中最后添加的文件
+            guard let target = urlsToAdd.last else { return }
+            if let file = allConfigFiles().first(where: { $0.url.standardizedFileURL == target.standardizedFileURL }) {
+                selectFile(file)
+            }
+        }
+    }
+
+    /// 聚合当前所有可见的配置文件（含环境变量、Agent、自定义路径）
+    private func allConfigFiles() -> [ConfigFile] {
+        (envCategory?.files ?? [])
+            + agentCategories.flatMap(\.files)
+            + customPathGroups.flatMap(\.files)
     }
 
     private func existingFileURLs(from urls: [URL]) -> [URL] {
@@ -378,11 +401,23 @@ final class AppViewModel: ObservableObject {
         guard !settings.hiddenFilePaths.contains(where: { $0.standardizedFileURL == standardizedURL }) else { return }
         settings.hiddenFilePaths.append(standardizedURL)
         settings.save()
-        // 如果当前选中的是被隐藏的文件，清除选择
+        recentlySelectedURLs.removeAll { $0 == standardizedURL }
+        // 如果当前选中的是被隐藏的文件，回退到最近的配置
         if selectedFile?.url.standardizedFileURL == standardizedURL {
-            selectFile(nil)
+            selectMostRecentRemainingFile()
         }
         Task { await refresh() }
+    }
+
+    /// 当当前文件被隐藏/删除时，从访问历史中选择最近一个仍然可见的配置文件
+    private func selectMostRecentRemainingFile() {
+        for url in recentlySelectedURLs.reversed() {
+            if let file = allConfigFiles().first(where: { $0.url.standardizedFileURL == url }) {
+                selectFile(file)
+                return
+            }
+        }
+        selectFile(nil)
     }
 
     /// 恢复显示被隐藏的文件

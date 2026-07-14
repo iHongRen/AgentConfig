@@ -267,6 +267,27 @@ final class EditorViewModel: ObservableObject {
         }
     }
 
+    /// 清空编辑器（当没有选中文件时调用）
+    ///
+    /// 复位内容、修改状态与搜索状态，并停止文件监控。
+    func clear() {
+        if isModified, let previousURL = currentFile?.url {
+            onModifiedChange?(previousURL, false)
+        }
+        fileWatcher.stopWatching()
+        content = ""
+        loadedContent = ""
+        currentFile = nil
+        isModified = false
+        isLoadingContent = false
+        lastLoadedDate = nil
+        hasExternalConflict = false
+        searchResults = []
+        currentSearchIndex = 0
+        searchQuery = ""
+        lastError = nil
+    }
+
     func requestNavigation(to target: PendingNavigationTarget) -> Bool {
         guard currentFile != nil, isModified else { return true }
         guard !hasExternalConflict else { return false }

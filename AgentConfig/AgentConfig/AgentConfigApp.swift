@@ -258,9 +258,12 @@ struct MainContentView: View {
             }
         )
         .onChange(of: appViewModel.selectedFile) { _, newFile in
-            guard let file = newFile else { return }
             codexProfileViewModel.clearSelection()
             claudeProfileViewModel.clearSelection()
+            guard let file = newFile else {
+                editorViewModel.clear()
+                return
+            }
             Task {
                 try? await editorViewModel.load(file: file)
             }
