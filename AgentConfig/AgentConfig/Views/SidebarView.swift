@@ -576,7 +576,11 @@ struct SidebarView: View {
     }
 
     private func preferredDirectory(for category: AgentCategory) -> URL? {
-        category.files.first?.url.deletingLastPathComponent()
+        // 优先使用该 Agent 第一个配置文件所在目录（参考 Finder 打开逻辑），如 Claude Code → ~/.claude/
+        if let dir = AgentDefinitions.definition(for: category.id)?.configFiles.first?.resolvedURLs.first?.deletingLastPathComponent() {
+            return dir
+        }
+        return category.files.first?.url.deletingLastPathComponent()
             ?? category.missingPaths.first?.deletingLastPathComponent()
     }
 
