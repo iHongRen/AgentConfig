@@ -19,7 +19,7 @@ struct CodexProfileEditorView: View {
         return AgentProfileEditorProfile(
             id: profile.id,
             name: profile.name,
-            nameMaxLength: 10,
+            nameMaxLength: viewModel.profileNameMaxLength,
             status: profileStatus(for: profile),
             canDelete: viewModel.profiles.count > 1,
             deleteConfirmation: AgentProfileEditorDeleteConfirmation(

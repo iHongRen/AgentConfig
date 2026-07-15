@@ -7,7 +7,7 @@ import Foundation
 
 final class ClaudeProfileViewModel: AgentProfileCollectionViewModel<ClaudeProfile> {
 
-    private static let profileNameMaxLength = 10
+    private static let profileNameMaxLength = 20
 
     init(service: ClaudeProfileServiceProtocol? = nil) {
         let resolvedService = service ?? ClaudeProfileService()

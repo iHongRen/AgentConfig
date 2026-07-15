@@ -7,7 +7,7 @@ import Foundation
 
 final class CodexProfileViewModel: AgentProfileCollectionViewModel<CodexProfile> {
 
-    private static let profileNameMaxLength = 10
+    private static let profileNameMaxLength = 20
 
     init(service: CodexProfileServiceProtocol? = nil) {
         let resolvedService = service ?? CodexProfileService()

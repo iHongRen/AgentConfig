@@ -33,7 +33,7 @@
 "search.close" = "关闭 (Esc)";
 "profile.delete" = "删除";
 "profile.cancel" = "取消";
-"profile.namePlaceholder" = "配置名称";
+"profile.namePlaceholder" = "配置名称(%d字)";
 "profile.deleteCurrent" = "删除当前配置";
 "profile.apply" = "应用";
 "profile.applyCurrent" = "应用当前配置";

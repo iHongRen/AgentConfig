@@ -111,6 +111,10 @@ class AgentProfileCollectionViewModel<Profile: AgentProfileRecord>: ObservableOb
         return profiles.first { $0.id == selectedProfileID }
     }
 
+    var profileNameMaxLength: Int {
+        configuration.profileNameMaxLength
+    }
+
     func loadProfiles() async {
         defer { didFinishInitialLoad = true }
 

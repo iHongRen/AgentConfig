@@ -33,7 +33,7 @@
 "search.close" = "Close (Esc)";
 "profile.delete" = "Delete";
 "profile.cancel" = "Cancel";
-"profile.namePlaceholder" = "Profile Name";
+"profile.namePlaceholder" = "Profile Name (%d chars)";
 "profile.deleteCurrent" = "Delete current profile";
 "profile.apply" = "Apply";
 "profile.applyCurrent" = "Apply current profile";

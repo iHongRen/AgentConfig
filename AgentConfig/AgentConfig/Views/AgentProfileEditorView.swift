@@ -100,7 +100,7 @@ struct AgentProfileEditorView: View {
                         text: $editingProfileName,
                         isFocused: $isNameFieldFocused,
                         maxLength: profile.nameMaxLength,
-                        placeholder: L10n.tr("profile.namePlaceholder", value: "Profile Name")
+                        placeholder: L10n.format("profile.namePlaceholder", value: "Profile Name (%d)", profile.nameMaxLength)
                     ) { truncated in
                         profile.updateName(truncated)
                     } onSubmit: {
@@ -111,7 +111,7 @@ struct AgentProfileEditorView: View {
                         profile.updateName(truncated)
                         dismissAllInputsFocus()
                     }
-                    .frame(width: profileNameFieldWidth(for: editingProfileName), alignment: .leading)
+                    .frame(width: nameFieldWidth(for: profile), alignment: .leading)
 
                     if !isNameFieldFocused {
                         Image(systemName: "square.and.pencil")
@@ -337,11 +337,21 @@ struct AgentProfileEditorView: View {
         return AgentProfileEditorSizing.defaultHeight(for: field, measuredHeight: measuredHeight)
     }
 
-    private func profileNameFieldWidth(for name: String) -> CGFloat {
-        let displayText = name.isEmpty ? L10n.tr("profile.namePlaceholder", value: "Profile Name") : name
+    private func profileNameFieldWidth(for name: String, maxLength: Int = 20) -> CGFloat {
+        let displayText = name.isEmpty ? L10n.format("profile.namePlaceholder", value: "Profile Name (%d)", maxLength) : name
         let font = NSFont.systemFont(ofSize: 13, weight: .semibold)
         let measuredWidth = ceil((displayText as NSString).size(withAttributes: [.font: font]).width)
         return min(max(measuredWidth + 10, 50), 240)
+    }
+
+    /// 聚焦时使用稳定且较宽的宽度，避免拼音组合期间因输入框过窄导致内容滚动前移；
+    /// 失焦时恢复贴合内容的药丸宽度。
+    private func nameFieldWidth(for profile: AgentProfileEditorProfile) -> CGFloat {
+        if isNameFieldFocused {
+            let sample = String(repeating: "中", count: profile.nameMaxLength)
+            return min(max(profileNameFieldWidth(for: sample, maxLength: profile.nameMaxLength), 200), 280)
+        }
+        return profileNameFieldWidth(for: editingProfileName, maxLength: profile.nameMaxLength)
     }
 
     private var nameFieldBackgroundColor: Color {
@@ -533,12 +543,14 @@ private struct ProfileNameField: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: ProfileNameNSTextField, context: Context) {
-        if nsView.stringValue != text {
-            nsView.stringValue = text
-        }
         context.coordinator.parent = self
         if isFocused, nsView.window?.firstResponder != nsView.currentEditor() {
             nsView.window?.makeFirstResponder(nsView)
+        }
+        // 输入法组合（拼音未上屏）期间不回写 stringValue，避免打断组合与光标前移
+        if (nsView.currentEditor() as? NSTextView)?.hasMarkedText() != true,
+           nsView.stringValue != text {
+            nsView.stringValue = text
         }
     }
 
@@ -555,6 +567,10 @@ private struct ProfileNameField: NSViewRepresentable {
 
         func controlTextDidChange(_ obj: Notification) {
             guard let tf = obj.object as? NSTextField else { return }
+            // 输入法组合中（拼音未上屏）不提交，避免框宽抖动与打断组合
+            if (tf.currentEditor() as? NSTextView)?.hasMarkedText() == true {
+                return
+            }
             var value = tf.stringValue
             if value.count > parent.maxLength {
                 value = String(value.prefix(parent.maxLength))
