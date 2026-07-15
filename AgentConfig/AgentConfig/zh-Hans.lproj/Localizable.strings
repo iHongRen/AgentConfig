@@ -47,6 +47,7 @@
 "profile.help.accessibility" = "文件说明";
 "profile.defaultName" = "未命名配置";
 "profile.newName" = "新配置";
+"profile.copySuffix" = "副本";
 "profile.deleted" = "已删除配置";
 "profile.deleteFailed" = "删除失败";
 "profile.applied" = "已应用配置";
@@ -74,6 +75,7 @@
 "sidebar.filesSection" = "文件";
 "sidebar.profilesSection" = "配置";
 "sidebar.deleteProfile" = "删除 Profile";
+"sidebar.duplicateProfile" = "复制配置";
 "sidebar.openInVSCode" = "在 VSCode 中打开";
 "sidebar.copyPath" = "复制路径";
 "sidebar.unapplied" = "未应用";

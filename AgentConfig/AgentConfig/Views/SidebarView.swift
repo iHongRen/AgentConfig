@@ -339,6 +339,12 @@ struct SidebarView: View {
         .animation(sidebarReorderAnimation, value: codexProfileViewModel.profiles.map(\.id))
         .buttonStyle(.plain)
         .contextMenu {
+            Button(L10n.tr("sidebar.duplicateProfile", value: "Duplicate Profile")) {
+                codexProfileViewModel.duplicateProfile(id: profile.id)
+            }
+
+            Divider()
+
             Button(L10n.tr("sidebar.deleteProfile", value: "Delete Profile")) {
                 deleteTarget = .deleteCodexProfile(profile)
             }
@@ -398,6 +404,12 @@ struct SidebarView: View {
         .animation(sidebarReorderAnimation, value: claudeProfileViewModel.profiles.map(\.id))
         .buttonStyle(.plain)
         .contextMenu {
+            Button(L10n.tr("sidebar.duplicateProfile", value: "Duplicate Profile")) {
+                claudeProfileViewModel.duplicateProfile(id: profile.id)
+            }
+
+            Divider()
+
             Button(L10n.tr("sidebar.deleteProfile", value: "Delete Profile")) {
                 deleteTarget = .deleteClaudeProfile(profile)
             }

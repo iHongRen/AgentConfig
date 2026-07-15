@@ -47,6 +47,7 @@
 "profile.help.accessibility" = "File Help";
 "profile.defaultName" = "Untitled Profile";
 "profile.newName" = "New Profile";
+"profile.copySuffix" = "Copy";
 "profile.deleted" = "Profile deleted";
 "profile.deleteFailed" = "Delete failed";
 "profile.applied" = "Profile applied";
@@ -74,6 +75,7 @@
 "sidebar.filesSection" = "Files";
 "sidebar.profilesSection" = "Profiles";
 "sidebar.deleteProfile" = "Delete Profile";
+"sidebar.duplicateProfile" = "Duplicate Profile";
 "sidebar.openInVSCode" = "Open in VSCode";
 "sidebar.copyPath" = "Copy Path";
 "sidebar.unapplied" = "Unapplied";

@@ -34,6 +34,19 @@ final class ClaudeProfileViewModel: AgentProfileCollectionViewModel<ClaudeProfil
                         isDirty: true
                     )
                 },
+                duplicateProfile: { source in
+                    ClaudeProfile(
+                        name: "\(source.name) \(L10n.tr("profile.copySuffix", value: "Copy"))",
+                        settingsText: source.settingsText,
+                        claudeJSONText: source.claudeJSONText,
+                        zshrcText: source.zshrcText,
+                        appliedSettingsText: source.appliedSettingsText,
+                        appliedClaudeJSONText: source.appliedClaudeJSONText,
+                        appliedZshrcText: source.appliedZshrcText,
+                        isActive: false,
+                        isDirty: source.isDirty
+                    )
+                },
                 lastVisitedProfileID: { page in
                     guard case .claudeProfile(let id) = page else { return nil }
                     return id

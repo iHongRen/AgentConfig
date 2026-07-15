@@ -28,6 +28,7 @@ struct AgentProfileCollectionConfiguration<Profile: AgentProfileRecord> {
     let isProfileDirty: (Profile) -> Bool
     let markProfileApplied: (inout Profile, Profile) -> Void
     let makeNewProfile: (Profile, Int) -> Profile
+    let duplicateProfile: (Profile) -> Profile
     let lastVisitedProfileID: (LastVisitedPage) -> UUID?
     let minimumProfileCountMessage: String
     let profileNotFoundMessage: String
@@ -48,6 +49,7 @@ struct AgentProfileCollectionConfiguration<Profile: AgentProfileRecord> {
         isProfileDirty: @escaping (Profile) -> Bool,
         markProfileApplied: @escaping (inout Profile, Profile) -> Void,
         makeNewProfile: @escaping (Profile, Int) -> Profile,
+        duplicateProfile: @escaping (Profile) -> Profile,
         lastVisitedProfileID: @escaping (LastVisitedPage) -> UUID?,
         minimumProfileCountMessage: String,
         profileNotFoundMessage: String,
@@ -64,6 +66,7 @@ struct AgentProfileCollectionConfiguration<Profile: AgentProfileRecord> {
         self.isProfileDirty = isProfileDirty
         self.markProfileApplied = markProfileApplied
         self.makeNewProfile = makeNewProfile
+        self.duplicateProfile = duplicateProfile
         self.lastVisitedProfileID = lastVisitedProfileID
         self.minimumProfileCountMessage = minimumProfileCountMessage
         self.profileNotFoundMessage = profileNotFoundMessage
@@ -186,6 +189,14 @@ class AgentProfileCollectionViewModel<Profile: AgentProfileRecord>: ObservableOb
         let profile = configuration.makeNewProfile(source, profiles.count)
         profiles.append(profile)
         selectedProfileID = profile.id
+        Task { await persistProfiles() }
+    }
+
+    func duplicateProfile(id: UUID) {
+        guard let source = profiles.first(where: { $0.id == id }) else { return }
+        let copy = configuration.duplicateProfile(source)
+        profiles.append(copy)
+        selectedProfileID = copy.id
         Task { await persistProfiles() }
     }
 

@@ -34,6 +34,19 @@ final class CodexProfileViewModel: AgentProfileCollectionViewModel<CodexProfile>
                         isDirty: true
                     )
                 },
+                duplicateProfile: { source in
+                    CodexProfile(
+                        name: "\(source.name) \(L10n.tr("profile.copySuffix", value: "Copy"))",
+                        configText: source.configText,
+                        authText: source.authText,
+                        zshrcText: source.zshrcText,
+                        appliedConfigText: source.appliedConfigText,
+                        appliedAuthText: source.appliedAuthText,
+                        appliedZshrcText: source.appliedZshrcText,
+                        isActive: false,
+                        isDirty: source.isDirty
+                    )
+                },
                 lastVisitedProfileID: { page in
                     guard case .codexProfile(let id) = page else { return nil }
                     return id
