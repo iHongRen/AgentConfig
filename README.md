@@ -4,11 +4,9 @@
 
 [English](./README_en.md)
 
-原生 macOS App，集中管理 Codex、Claude Code 的配置文件和多套方案切换。
+原生 macOS App，集中管理 Codex、Claude Code 的配置文件，支持多套 Profile 快速切换。
 
 ![](./screenshots/screenshot_cn.png)
-
-
 
 ## 安装
 
@@ -24,19 +22,14 @@ xattr -dr com.apple.quarantine /Applications/AgentConfig.app
 
 ## 功能
 
-- **配置编辑** — 8 种语法高亮（JSON/YAML/TOML/Shell 等）、Cmd+F 搜索、JSON 格式化、外部变更检测
-- **Profile 管理** — 多套方案一键切换，`.zshrc` 托管块不覆盖原有内容，事务写入失败自动回滚
-- **侧边栏** — 自动扫描已知配置、可拖拽添加自定义路径、右键快捷操作、未保存标记
-
+- **配置编辑** — 语法高亮（JSON / JSONC / JSON5 / JSONL / YAML / TOML / Shell / 纯文本）、Cmd+F 搜索、JSON 格式化、外部变更检测
+- **Profile 管理** — 多套方案一键写回磁盘，`.zshrc` 托管块独立分区不覆盖原有内容，多文件事务写入失败自动回滚
+- **侧边栏** — 启动扫描已安装 Agent 的配置文件和 Shell 环境变量文件，右键菜单直达 Finder / VSCode / 复制路径，拖拽文件到分类即可收录
 
 ## 配置文件
 
-| Agent | 文件 |
-|-------|------|
-| **Codex** | `~/.codex/config.toml`、`~/.codex/auth.json` |
-| **Claude Code** | `~/.claude/settings.json`、`~/.claude.json` |
-| **环境变量** | `.zshrc`、`.zprofile`、`.bashrc`、`.bash_profile` 等 |
+**Codex**：`~/.codex/config.toml`、`~/.codex/auth.json`
 
+**Claude Code**：`~/.claude/settings.json`、`~/.claude.json`
 
-
-
+**Shell 环境变量**：`.zshrc`、`.zprofile`、`.zshenv`、`.bashrc`、`.bash_profile` 等

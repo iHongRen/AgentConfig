@@ -58,7 +58,7 @@ Views (SwiftUI + AppKit via NSViewRepresentable)
 - **CommentingTextView** — `NSTextView` subclass handling Cmd+/ comment toggling, dispatching to `FileType.lineCommentPrefix`.
 - **SettingsView** — appearance (light/dark/system) and language (en/zh-Hans/system) settings.
 - **AboutView** — app info, version, build number, author credits.
-- **AgentScanner** — scans `~` for known agent config files using definitions from `AgentDefinitions` (currently 5 default agents: Claude Code, Codex, Gemini CLI, OpenCode CLI, Qwen Code).
+- **AgentScanner** — scans `~` for known agent config files using definitions from `AgentDefinitions` (2 enabled: Claude Code, Codex; 3 commented-out: Gemini CLI, OpenCode CLI, Qwen Code).
 - **FileWatcher** — `DispatchSourceFileSystemObject` with 500ms debounce for external change detection.
 - **AppSettings** — `UserDefaults` wrapper for appearance, language, customPaths, hiddenFiles, and per-category added file paths.
 - **AppError** — `LocalizedError` enum: `fileReadFailed`, `fileWriteFailed`, `jsonFormatError`.
@@ -74,8 +74,8 @@ Each service is defined as a protocol + implementation:
 | `AgentScannerProtocol` | `AgentScanner` | Discover config files on disk |
 | `FileServiceProtocol` | `FileService` | Read/write/create/delete files |
 | `FileWatcherProtocol` | `FileWatcher` | Watch open files for external changes |
-| `CodexProfileServiceProtocol` | `CodexProfileService` | Persist and apply Codex profiles (`~/.codex/config.toml`, `~/.codex/auth.json`, managed `.zshrc` block) |
-| `ClaudeProfileServiceProtocol` | `ClaudeProfileService` | Persist and apply Claude Code profiles (`~/.claude/settings.json`, `~/.claude.json`, managed `.zshrc` block) |
+| `CodexProfileServiceProtocol` | `CodexProfileService` | Persist and apply Codex profiles (`~/.codex/config.toml`, `~/.codex/auth.json`, managed `.zshrc` block). Writes are transactional with rollback on failure. |
+| `ClaudeProfileServiceProtocol` | `ClaudeProfileService` | Persist and apply Claude Code profiles (`~/.claude/settings.json`, deep-merge `.claude.json` into disk copy, managed `.zshrc` block). Writes are transactional with rollback on failure. |
 
 ### Data flow
 
@@ -84,11 +84,11 @@ Each service is defined as a protocol + implementation:
 3. Cmd+S → `EditorViewModel.save()` → `FileService.write()`
 4. User selects a Codex profile → `CodexProfileViewModel.selectedProfile` changes → detail pane shows `CodexProfileEditorView`
 5. User selects a Claude profile → `ClaudeProfileViewModel.selectedProfile` changes → detail pane shows `ClaudeProfileEditorView`
-6. User applies profile → `CodexProfileService.apply(profile:)` or `ClaudeProfileService.apply(profile:)` writes agent config files and updates the managed `.zshrc` block
+6. User applies profile → `CodexProfileService.apply(profile:)` writes agent config and managed `.zshrc` block; `ClaudeProfileService.apply(profile:)` writes `settings.json`, deep-merges `.claude.json` with disk, and updates managed `.zshrc` block
 
 ### Adding a new agent
 
-1. Add entries to `AgentDefinitions.swift` static arrays
+1. In `AgentDefinitions.swift`, uncomment the existing agent definition (Gemini CLI, OpenCode CLI, Qwen Code are already defined but commented out) or add a new `AgentDefinition` to the `allAgents` array
 2. Add icon image to `Assets.xcassets`
 3. Update i18n strings for both en and zh-Hans if user-facing copy is added
 

@@ -4,7 +4,7 @@
 
 [中文](./README.md)
 
-A native macOS app for managing Codex and Claude Code config files and switching between profiles.
+A native macOS app for managing Codex and Claude Code config files, with multi-profile switching.
 
 ![](./screenshots/screenshot_en.png)
 
@@ -22,14 +22,14 @@ xattr -dr com.apple.quarantine /Applications/AgentConfig.app
 
 ## Features
 
-- **Config Editor** — Syntax highlighting for 8 formats (JSON/YAML/TOML/Shell, etc.), Cmd+F search, JSON formatting, external change detection
-- **Profile Manager** — One-click profile switching, managed `.zshrc` blocks that won't overwrite your own content, transactional writes with auto-rollback
-- **Sidebar** — Auto-discovers config files, drag-and-drop custom paths, right-click shortcuts, unsaved change indicators
+- **Config Editor** — Syntax highlighting (JSON / JSONC / JSON5 / JSONL / YAML / TOML / Shell / Plain Text), Cmd+F search, JSON formatting, external change detection
+- **Profile Manager** — One-click apply profiles to disk, managed `.zshrc` blocks isolated from your own config, transactional multi-file writes with auto-rollback on failure
+- **Sidebar** — Auto-scans installed agent configs and shell env files, right-click to open in Finder / VSCode / copy path, drag files onto a category to add them
 
-## Configs
+## Config Files
 
-| Agent | Files |
-|-------|-------|
-| **Codex** | `~/.codex/config.toml`, `~/.codex/auth.json` |
-| **Claude Code** | `~/.claude/settings.json`, `~/.claude.json` |
-| **Shell env** | `.zshrc`, `.zprofile`, `.bashrc`, `.bash_profile` etc. |
+**Codex**：`~/.codex/config.toml`, `~/.codex/auth.json`
+
+**Claude Code**：`~/.claude/settings.json`, `~/.claude.json`
+
+**Shell env**：`.zshrc`, `.zprofile`, `.zshenv`, `.bashrc`, `.bash_profile`, etc 
