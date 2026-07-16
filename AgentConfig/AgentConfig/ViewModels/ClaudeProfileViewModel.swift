@@ -125,9 +125,32 @@ final class ClaudeProfileViewModel: AgentProfileCollectionViewModel<ClaudeProfil
     }
 
     nonisolated private static func isProfileOutOfSync(_ profile: ClaudeProfile, _ disk: ProfileDiskContents) -> Bool {
-        ProfileContentNormalizer.json(profile.appliedSettingsText) != ProfileContentNormalizer.json(disk.configText ?? "")
-            || !ProfileContentNormalizer.jsonSubset(disk.authText ?? "", profile.appliedClaudeJSONText)
-            || ProfileContentNormalizer.text(profile.appliedZshrcText) != ProfileContentNormalizer.text(disk.zshrcText ?? "")
+        let diskConfig = disk.configText ?? ""
+        let diskAuth = disk.authText ?? ""
+        let diskZshrc = disk.zshrcText ?? ""
+
+        let appliedSettings = profile.appliedSettingsText
+        let appliedClaudeJSON = profile.appliedClaudeJSONText
+        let appliedZshrc = profile.appliedZshrcText
+
+        // 关键字段：ANTHROPIC_BASE_URL、ANTHROPIC_AUTH_TOKEN
+        // 可能存在于 settings.json / .claude.json（JSON）或 .zshrc 托管块（环境变量）中；
+        // 任一关键字段与磁盘不一致即判定外部改动。
+        let keyFields = ["ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN"]
+
+        for key in keyFields {
+            let appliedVal = ProfileContentNormalizer.jsonKey(appliedSettings, key)
+                ?? ProfileContentNormalizer.jsonKey(appliedClaudeJSON, key)
+            let diskVal = ProfileContentNormalizer.jsonKey(diskConfig, key)
+                ?? ProfileContentNormalizer.jsonKey(diskAuth, key)
+            if appliedVal != diskVal { return true }
+
+            let appliedZshrcVal = ProfileContentNormalizer.shellEnv(appliedZshrc, key)
+            let diskZshrcVal = ProfileContentNormalizer.shellEnv(diskZshrc, key)
+            if appliedZshrcVal != diskZshrcVal { return true }
+        }
+
+        return false
     }
 
     private static func makeFallbackProfile() -> ClaudeProfile {

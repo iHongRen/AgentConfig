@@ -120,8 +120,28 @@ final class CodexProfileViewModel: AgentProfileCollectionViewModel<CodexProfile>
     }
 
     nonisolated private static func isProfileOutOfSync(_ profile: CodexProfile, _ disk: ProfileDiskContents) -> Bool {
-        ProfileContentNormalizer.text(profile.appliedConfigText) != ProfileContentNormalizer.text(disk.configText ?? "")
-            || ProfileContentNormalizer.json(profile.appliedAuthText) != ProfileContentNormalizer.json(disk.authText ?? "")
-            || ProfileContentNormalizer.text(profile.appliedZshrcText) != ProfileContentNormalizer.text(disk.zshrcText ?? "")
+        let diskConfig = disk.configText ?? ""
+        let diskAuth = disk.authText ?? ""
+        let diskZshrc = disk.zshrcText ?? ""
+
+        let appliedConfig = profile.appliedConfigText
+        let appliedAuth = profile.appliedAuthText
+        let appliedZshrc = profile.appliedZshrcText
+
+        // 关键字段：config.toml 的 base_url、auth.json 的 OPENAI_API_KEY
+        // 以及 .zshrc 托管块中对应的环境变量；任一关键字段与磁盘不一致即判定外部改动。
+        let configBaseURL = ProfileContentNormalizer.tomlKey(appliedConfig, "base_url")
+        let diskBaseURL = ProfileContentNormalizer.tomlKey(diskConfig, "base_url")
+        if configBaseURL != diskBaseURL { return true }
+
+        let authKey = ProfileContentNormalizer.jsonKey(appliedAuth, "OPENAI_API_KEY")
+        let diskAuthKey = ProfileContentNormalizer.jsonKey(diskAuth, "OPENAI_API_KEY")
+        if authKey != diskAuthKey { return true }
+
+        let zshrcKey = ProfileContentNormalizer.shellEnv(appliedZshrc, "OPENAI_API_KEY")
+        let diskZshrcKey = ProfileContentNormalizer.shellEnv(diskZshrc, "OPENAI_API_KEY")
+        if zshrcKey != diskZshrcKey { return true }
+
+        return false
     }
 }
