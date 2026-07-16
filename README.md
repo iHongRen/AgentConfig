@@ -2,6 +2,8 @@
 
 [![GitHub Release](https://img.shields.io/github/v/release/iHongRen/AgentConfig?style=flat-square)](https://github.com/iHongRen/AgentConfig/releases) [![Downloads](https://img.shields.io/github/downloads/iHongRen/AgentConfig/total?style=flat-square)](https://github.com/iHongRen/AgentConfig/releases) ![macOS](https://img.shields.io/badge/macOS-14.0%2B-black?style=flat-square&logo=apple) [![License](https://img.shields.io/github/license/iHongRen/AgentConfig?style=flat-square)](./LICENSE)
 
+[English](./README_en.md)
+
 原生 macOS App，集中管理 Codex、Claude Code 的配置文件和多套方案切换。
 
 ![](./screenshots/screenshot_cn.png)
