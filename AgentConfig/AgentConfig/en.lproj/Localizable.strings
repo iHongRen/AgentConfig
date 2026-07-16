@@ -78,10 +78,6 @@
 "sidebar.duplicateProfile" = "Duplicate Profile";
 "sidebar.openInVSCode" = "Open in VSCode";
 "sidebar.copyPath" = "Copy Path";
-"sidebar.unapplied" = "Unapplied";
-"sidebar.applied" = "Applied";
-"sidebar.draft" = "Draft";
-"sidebar.external" = "External";
 "sidebar.create" = "Create";
 "sidebar.addFilePanel.title" = "Add File";
 "sidebar.addFilePanel.message" = "Choose files to add to this category";

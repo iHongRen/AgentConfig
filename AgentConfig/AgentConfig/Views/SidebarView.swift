@@ -496,29 +496,29 @@ struct SidebarView: View {
     }
 
     private func profileStatusText(_ profile: CodexProfile, isOutOfSync: Bool) -> String {
-        if profile.isDirty { return L10n.tr("sidebar.unapplied", value: "Unapplied") }
-        if isOutOfSync { return L10n.tr("sidebar.external", value: "External") }
-        if profile.isActive { return L10n.tr("sidebar.applied", value: "Applied") }
-        return L10n.tr("sidebar.draft", value: "Draft")
+        if profile.isDirty { return L10n.tr("profile.status.modified", value: "Unapplied Changes") }
+        if profile.isActive && isOutOfSync { return L10n.tr("profile.status.external", value: "External Changes") }
+        if profile.isActive { return L10n.tr("profile.status.active", value: "Active") }
+        return L10n.tr("profile.status.ready", value: "Ready to Apply")
     }
 
     private func profileStateColor(_ profile: CodexProfile, isOutOfSync: Bool) -> Color {
         if profile.isDirty { return .orange }
-        if isOutOfSync { return .red }
+        if profile.isActive && isOutOfSync { return .red }
         if profile.isActive { return .green }
         return Color(nsColor: .tertiaryLabelColor)
     }
 
     private func claudeProfileStatusText(_ profile: ClaudeProfile, isOutOfSync: Bool) -> String {
-        if profile.isDirty { return L10n.tr("sidebar.unapplied", value: "Unapplied") }
-        if isOutOfSync { return L10n.tr("sidebar.external", value: "External") }
-        if profile.isActive { return L10n.tr("sidebar.applied", value: "Applied") }
-        return L10n.tr("sidebar.draft", value: "Draft")
+        if profile.isDirty { return L10n.tr("profile.status.modified", value: "Unapplied Changes") }
+        if profile.isActive && isOutOfSync { return L10n.tr("profile.status.external", value: "External Changes") }
+        if profile.isActive { return L10n.tr("profile.status.active", value: "Active") }
+        return L10n.tr("profile.status.ready", value: "Ready to Apply")
     }
 
     private func claudeProfileStateColor(_ profile: ClaudeProfile, isOutOfSync: Bool) -> Color {
         if profile.isDirty { return .orange }
-        if isOutOfSync { return .red }
+        if profile.isActive && isOutOfSync { return .red }
         if profile.isActive { return .green }
         return Color(nsColor: .tertiaryLabelColor)
     }

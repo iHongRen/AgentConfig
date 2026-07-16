@@ -78,10 +78,6 @@
 "sidebar.duplicateProfile" = "复制配置";
 "sidebar.openInVSCode" = "在 VSCode 中打开";
 "sidebar.copyPath" = "复制路径";
-"sidebar.unapplied" = "未应用";
-"sidebar.applied" = "已应用";
-"sidebar.draft" = "草稿";
-"sidebar.external" = "外部改动";
 "sidebar.create" = "创建";
 "sidebar.addFilePanel.title" = "添加文件";
 "sidebar.addFilePanel.message" = "选择要添加到此分类的文件";
