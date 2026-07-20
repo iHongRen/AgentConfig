@@ -4,9 +4,20 @@
 
 [中文](./README.md)
 
-A native macOS app for managing Codex and Claude Code config files, with multi-profile switching.
+A native macOS app for managing Codex and Claude Code config files, API keys, and environment variables — with multi-profile switching.
 
 ![](./screenshots/screenshot_en.png)
+
+## Features
+
+- Multi-account API key switching
+- Isolated profile blocks
+- Visual env var management
+- Syntax highlighting editor
+- Search & format (Cmd+F)
+- External change detection
+- Sidebar quick actions
+- Drag & drop to add files
 
 ## Install
 
@@ -20,16 +31,6 @@ Or download `AgentConfig.dmg` from [GitHub Releases](https://github.com/iHongRen
 xattr -dr com.apple.quarantine /Applications/AgentConfig.app
 ```
 
-## Features
+## Security
 
-- **Config Editor** — Syntax highlighting (JSON / JSONC / JSON5 / JSONL / YAML / TOML / Shell / Plain Text), Cmd+F search, JSON formatting, external change detection
-- **Profile Manager** — One-click apply profiles to disk, managed `.zshrc` blocks isolated from your own config, transactional multi-file writes with auto-rollback on failure
-- **Sidebar** — Auto-scans installed agent configs and shell env files, right-click to open in Finder / VSCode / copy path, drag files onto a category to add them
-
-## Config Files
-
-**Codex**：`~/.codex/config.toml`, `~/.codex/auth.json`
-
-**Claude Code**：`~/.claude/settings.json`, `~/.claude.json`
-
-**Shell env**：`.zshrc`, `.zprofile`, `.zshenv`, `.bashrc`, `.bash_profile`, etc 
+This app makes **no network requests**. All data is stored entirely on your local machine — your API keys and configs are never uploaded or leaked.

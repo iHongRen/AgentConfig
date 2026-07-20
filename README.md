@@ -4,9 +4,20 @@
 
 [English](./README_en.md)
 
-原生 macOS App，集中管理 Codex、Claude Code 的配置文件，支持多套 Profile 快速切换。
+原生 macOS App，集中管理 Codex、Claude Code 等 AI 编程工具的配置文件和 API Key，支持多套配置快速切换。
 
 ![](./screenshots/screenshot_cn.png)
+
+## 功能
+
+- 多账号 API Key 一键切换
+- Profile 独立分区管理
+- 可视化增删环境变量
+- 多格式语法高亮编辑
+- Cmd+F 搜索与格式化
+- 外部变更自动检测
+- 侧边栏右键快捷操作
+- 拖拽文件快速收录
 
 ## 安装
 
@@ -20,16 +31,6 @@ curl -fsSL https://raw.githubusercontent.com/iHongRen/AgentConfig/main/install.s
 xattr -dr com.apple.quarantine /Applications/AgentConfig.app
 ```
 
-## 功能
+## 安全
 
-- **配置编辑** — 语法高亮（JSON / JSONC / JSON5 / JSONL / YAML / TOML / Shell / 纯文本）、Cmd+F 搜索、JSON 格式化、外部变更检测
-- **Profile 管理** — 多套方案一键写回磁盘，`.zshrc` 托管块独立分区不覆盖原有内容，多文件事务写入失败自动回滚
-- **侧边栏** — 启动扫描已安装 Agent 的配置文件和 Shell 环境变量文件，右键菜单直达 Finder / VSCode / 复制路径，拖拽文件到分类即可收录
-
-## 配置文件
-
-**Codex**：`~/.codex/config.toml`、`~/.codex/auth.json`
-
-**Claude Code**：`~/.claude/settings.json`、`~/.claude.json`
-
-**Shell 环境变量**：`.zshrc`、`.zprofile`、`.zshenv`、`.bashrc`、`.bash_profile` 等
+本应用**无网络请求**，所有数据完全存储在本地，不会上传或泄露你的 API Key 和配置信息。
