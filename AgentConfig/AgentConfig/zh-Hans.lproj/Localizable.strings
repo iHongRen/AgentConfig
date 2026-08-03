@@ -109,7 +109,7 @@
 "qwen.deleteConfirmation.title" = "删除 Qwen Profile？";
 "qwen.deleteConfirmation.message" = "将删除“%@”。此操作不会修改已经写入磁盘的 Qwen 配置文件。";
 "qwen.field.settings.help" = "Qwen Code 的设置文件。应用时会将 modelProviders、model 和认证方式等内容整体写入 ~/.qwen/settings.json。默认的 OpenAI 兼容配置直接使用 OPENAI_API_KEY。";
-"qwen.field.env.help" = "Qwen Code 的 API Key 侧车文件。默认模板直接使用 OPENAI_API_KEY，字符更短，也更符合常见 OpenAI 兼容提供方的用法。";
+"qwen.field.env.help" = "Qwen Code 的 API Key 文件。默认模板直接使用 OPENAI_API_KEY，字符更短，也更符合常见 OpenAI 兼容提供方的用法。";
 "qwen.field.zshrc.help" = "用于放可选的 shell 导出。默认 Profile 会保持这里为空，避免和 ~/.qwen/settings.json.env 里的 API Key 重复维护。";
 "about.version.build" = "版本 %@";
 "error.fileReadFailed" = "读取文件“%@”失败：%@";
