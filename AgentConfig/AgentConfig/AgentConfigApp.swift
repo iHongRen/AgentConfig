@@ -83,6 +83,8 @@ struct AgentConfigApp: App {
     @StateObject private var editorViewModel = EditorViewModel()
     @StateObject private var codexProfileViewModel = CodexProfileViewModel()
     @StateObject private var claudeProfileViewModel = ClaudeProfileViewModel()
+    @StateObject private var openCodeProfileViewModel = OpenCodeProfileViewModel()
+    @StateObject private var qwenProfileViewModel = QwenProfileViewModel()
     @StateObject private var saveCoordinator = CommandCoordinator()
 
     // MARK: - Window Controllers
@@ -107,6 +109,8 @@ struct AgentConfigApp: App {
                 editorViewModel: editorViewModel,
                 codexProfileViewModel: codexProfileViewModel,
                 claudeProfileViewModel: claudeProfileViewModel,
+                openCodeProfileViewModel: openCodeProfileViewModel,
+                qwenProfileViewModel: qwenProfileViewModel,
                 saveCoordinator: saveCoordinator
             )
             .id(languageChangeID)  // 语言切换时强制重建整个视图树
@@ -179,6 +183,8 @@ struct AgentConfigApp: App {
             Task { await editorViewModel.onForeground() }
             Task { await codexProfileViewModel.refreshDiskSyncState() }
             Task { await claudeProfileViewModel.refreshDiskSyncState() }
+            Task { await openCodeProfileViewModel.refreshDiskSyncState() }
+            Task { await qwenProfileViewModel.refreshDiskSyncState() }
         }
     }
 
@@ -213,6 +219,8 @@ struct MainContentView: View {
     @ObservedObject var editorViewModel: EditorViewModel
     @ObservedObject var codexProfileViewModel: CodexProfileViewModel
     @ObservedObject var claudeProfileViewModel: ClaudeProfileViewModel
+    @ObservedObject var openCodeProfileViewModel: OpenCodeProfileViewModel
+    @ObservedObject var qwenProfileViewModel: QwenProfileViewModel
     @ObservedObject var saveCoordinator: CommandCoordinator
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var windowWidth: CGFloat = .zero
@@ -224,14 +232,19 @@ struct MainContentView: View {
                 editorViewModel: editorViewModel,
                 codexProfileViewModel: codexProfileViewModel,
                 claudeProfileViewModel: claudeProfileViewModel,
+                openCodeProfileViewModel: openCodeProfileViewModel,
+                qwenProfileViewModel: qwenProfileViewModel,
                 onNavigate: handleNavigation
             )
-                .environmentObject(appViewModel)
         } detail: {
             if codexProfileViewModel.selectedProfile != nil {
                 CodexProfileEditorView(viewModel: codexProfileViewModel)
             } else if claudeProfileViewModel.selectedProfile != nil {
                 ClaudeProfileEditorView(viewModel: claudeProfileViewModel)
+            } else if openCodeProfileViewModel.selectedProfile != nil {
+                OpenCodeProfileEditorView(viewModel: openCodeProfileViewModel)
+            } else if qwenProfileViewModel.selectedProfile != nil {
+                QwenProfileEditorView(viewModel: qwenProfileViewModel)
             } else {
                 EditorView(
                     editorViewModel: editorViewModel,
@@ -245,6 +258,7 @@ struct MainContentView: View {
                 }
             }
         }
+        .environmentObject(appViewModel)
         .frame(minWidth: 600, minHeight: 640)
         .background(
             GeometryReader { proxy in
@@ -264,6 +278,8 @@ struct MainContentView: View {
             }
             codexProfileViewModel.clearSelection()
             claudeProfileViewModel.clearSelection()
+            openCodeProfileViewModel.clearSelection()
+            qwenProfileViewModel.clearSelection()
             Task {
                 try? await editorViewModel.load(file: file)
             }
@@ -278,6 +294,16 @@ struct MainContentView: View {
             guard let newProfileID else { return }
             appViewModel.persistLastVisitedPage(.claudeProfile(id: newProfileID))
         }
+        .onChange(of: openCodeProfileViewModel.selectedProfileID) { _, newProfileID in
+            guard hasResolvedInitialPage else { return }
+            guard let newProfileID else { return }
+            appViewModel.persistLastVisitedPage(.opencodeProfile(id: newProfileID))
+        }
+        .onChange(of: qwenProfileViewModel.selectedProfileID) { _, newProfileID in
+            guard hasResolvedInitialPage else { return }
+            guard let newProfileID else { return }
+            appViewModel.persistLastVisitedPage(.qwenProfile(id: newProfileID))
+        }
         .onChange(of: appViewModel.didFinishInitialRefresh) { _, _ in
             resolveInitialPageIfNeeded()
         }
@@ -285,6 +311,12 @@ struct MainContentView: View {
             resolveInitialPageIfNeeded()
         }
         .onChange(of: claudeProfileViewModel.didFinishInitialLoad) { _, _ in
+            resolveInitialPageIfNeeded()
+        }
+        .onChange(of: openCodeProfileViewModel.didFinishInitialLoad) { _, _ in
+            resolveInitialPageIfNeeded()
+        }
+        .onChange(of: qwenProfileViewModel.didFinishInitialLoad) { _, _ in
             resolveInitialPageIfNeeded()
         }
         .onAppear {
@@ -297,18 +329,40 @@ struct MainContentView: View {
         case .configFile(let file):
             codexProfileViewModel.clearSelection()
             claudeProfileViewModel.clearSelection()
+            openCodeProfileViewModel.clearSelection()
+            qwenProfileViewModel.clearSelection()
             appViewModel.selectFile(file)
         case .codexProfile(let id):
             appViewModel.selectFile(nil)
             claudeProfileViewModel.clearSelection()
+            openCodeProfileViewModel.clearSelection()
+            qwenProfileViewModel.clearSelection()
             if let profile = codexProfileViewModel.profiles.first(where: { $0.id == id }) {
                 codexProfileViewModel.selectProfile(profile)
             }
         case .claudeProfile(let id):
             appViewModel.selectFile(nil)
             codexProfileViewModel.clearSelection()
+            openCodeProfileViewModel.clearSelection()
+            qwenProfileViewModel.clearSelection()
             if let profile = claudeProfileViewModel.profiles.first(where: { $0.id == id }) {
                 claudeProfileViewModel.selectProfile(profile)
+            }
+        case .opencodeProfile(let id):
+            appViewModel.selectFile(nil)
+            codexProfileViewModel.clearSelection()
+            claudeProfileViewModel.clearSelection()
+            qwenProfileViewModel.clearSelection()
+            if let profile = openCodeProfileViewModel.profiles.first(where: { $0.id == id }) {
+                openCodeProfileViewModel.selectProfile(profile)
+            }
+        case .qwenProfile(let id):
+            appViewModel.selectFile(nil)
+            codexProfileViewModel.clearSelection()
+            claudeProfileViewModel.clearSelection()
+            openCodeProfileViewModel.clearSelection()
+            if let profile = qwenProfileViewModel.profiles.first(where: { $0.id == id }) {
+                qwenProfileViewModel.selectProfile(profile)
             }
         }
     }
@@ -331,7 +385,9 @@ struct MainContentView: View {
         guard !hasResolvedInitialPage else { return }
         guard appViewModel.didFinishInitialRefresh,
               codexProfileViewModel.didFinishInitialLoad,
-              claudeProfileViewModel.didFinishInitialLoad else { return }
+              claudeProfileViewModel.didFinishInitialLoad,
+              openCodeProfileViewModel.didFinishInitialLoad,
+              qwenProfileViewModel.didFinishInitialLoad else { return }
 
         hasResolvedInitialPage = true
 
@@ -346,6 +402,21 @@ struct MainContentView: View {
             return
         }
 
+        if openCodeProfileViewModel.restoreInitialSelectionIfNeeded(appViewModel: appViewModel) {
+            appViewModel.selectFile(nil)
+            codexProfileViewModel.clearSelection()
+            claudeProfileViewModel.clearSelection()
+            return
+        }
+
+        if qwenProfileViewModel.restoreInitialSelectionIfNeeded(appViewModel: appViewModel) {
+            appViewModel.selectFile(nil)
+            codexProfileViewModel.clearSelection()
+            claudeProfileViewModel.clearSelection()
+            openCodeProfileViewModel.clearSelection()
+            return
+        }
+
         if appViewModel.restoreInitialSelectionIfNeeded() != nil {
             return
         }
@@ -354,6 +425,10 @@ struct MainContentView: View {
             appViewModel.persistLastVisitedPage(.codexProfile(id: defaultProfileID))
         } else if let defaultProfileID = claudeProfileViewModel.defaultSelectedProfileID() {
             appViewModel.persistLastVisitedPage(.claudeProfile(id: defaultProfileID))
+        } else if let defaultProfileID = openCodeProfileViewModel.defaultSelectedProfileID() {
+            appViewModel.persistLastVisitedPage(.opencodeProfile(id: defaultProfileID))
+        } else if let defaultProfileID = qwenProfileViewModel.defaultSelectedProfileID() {
+            appViewModel.persistLastVisitedPage(.qwenProfile(id: defaultProfileID))
         }
     }
 }

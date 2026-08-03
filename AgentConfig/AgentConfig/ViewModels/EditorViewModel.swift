@@ -22,6 +22,8 @@ final class EditorViewModel: ObservableObject {
         case configFile(ConfigFile)
         case codexProfile(UUID)
         case claudeProfile(UUID)
+        case opencodeProfile(UUID)
+        case qwenProfile(UUID)
     }
 
     // MARK: - Published Properties

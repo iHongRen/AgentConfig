@@ -37,19 +37,24 @@ struct AgentScanner: AgentScannerProtocol {
         var categories: [AgentCategory] = []
 
         for definition in AgentDefinitions.all {
-            let allURLs = definition.configFiles
-                .flatMap(\.resolvedURLs)
-                .uniqued(by: \.path)
+            var collectedFiles: [ConfigFile] = []
+            var missingPaths: [URL] = []
 
-            let collectedFiles = allURLs
-                .filter { fileManager.fileExists(atPath: $0.path) }
-                .map { ConfigFile(url: $0) }
+            for entry in definition.configFiles {
+                let resolvedURLs = entry.resolvedURLs.uniqued(by: \.path)
+                if let matchedURL = resolvedURLs.first(where: { fileManager.fileExists(atPath: $0.path) }) {
+                    collectedFiles.append(ConfigFile(url: matchedURL))
+                } else if let canonicalURL = resolvedURLs.first {
+                    missingPaths.append(canonicalURL)
+                }
+            }
+
+            collectedFiles = collectedFiles
                 .sorted {
                     $0.url.lastPathComponent.localizedCaseInsensitiveCompare($1.url.lastPathComponent) == .orderedAscending
                 }
 
-            let missingPaths = allURLs
-                .filter { !fileManager.fileExists(atPath: $0.path) }
+            missingPaths = missingPaths
                 .sorted {
                     $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending
                 }

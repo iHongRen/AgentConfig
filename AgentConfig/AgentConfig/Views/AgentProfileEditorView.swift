@@ -10,6 +10,7 @@ struct AgentProfileEditorView: View {
 
     let profile: AgentProfileEditorProfile?
 
+    @EnvironmentObject private var appViewModel: AppViewModel
     @Environment(\.colorScheme) private var colorScheme
     @State private var isNameFieldFocused: Bool = false
 
@@ -154,7 +155,11 @@ struct AgentProfileEditorView: View {
 
             Button {
                 Task {
-                    showToast((await profile.apply()).message)
+                    let result = await profile.apply()
+                    if result.isSuccess {
+                        await appViewModel.refresh()
+                    }
+                    showToast(result.message)
                 }
             } label: {
                 Label(L10n.tr("profile.apply", value: "Apply"), systemImage: "checkmark.circle")

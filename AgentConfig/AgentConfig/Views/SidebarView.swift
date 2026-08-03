@@ -22,6 +22,8 @@ struct SidebarView: View {
     @ObservedObject var editorViewModel: EditorViewModel
     @ObservedObject var codexProfileViewModel: CodexProfileViewModel
     @ObservedObject var claudeProfileViewModel: ClaudeProfileViewModel
+    @ObservedObject var openCodeProfileViewModel: OpenCodeProfileViewModel
+    @ObservedObject var qwenProfileViewModel: QwenProfileViewModel
     let onNavigate: (EditorViewModel.PendingNavigationTarget) -> Void
 
     @State private var isEnvExpanded = true
@@ -32,17 +34,23 @@ struct SidebarView: View {
     @State private var activeAgentDragID: String?
     @State private var activeCodexProfileDragID: UUID?
     @State private var activeClaudeProfileDragID: UUID?
+    @State private var activeOpenCodeProfileDragID: UUID?
+    @State private var activeQwenProfileDragID: UUID?
 
     enum DeleteTarget: Identifiable {
         case hideFile(URL)
         case deleteCodexProfile(CodexProfile)
         case deleteClaudeProfile(ClaudeProfile)
+        case deleteOpenCodeProfile(OpenCodeProfile)
+        case deleteQwenProfile(QwenProfile)
 
         var id: String {
             switch self {
             case .hideFile(let url): return "hide-\(url.absoluteString)"
             case .deleteCodexProfile(let profile): return "profile-\(profile.id.uuidString)"
             case .deleteClaudeProfile(let profile): return "claude-profile-\(profile.id.uuidString)"
+            case .deleteOpenCodeProfile(let profile): return "opencode-profile-\(profile.id.uuidString)"
+            case .deleteQwenProfile(let profile): return "qwen-profile-\(profile.id.uuidString)"
             }
         }
     }
@@ -96,6 +104,24 @@ struct SidebarView: View {
                     },
                     secondaryButton: .cancel(Text(L10n.tr("profile.cancel", value: "Cancel")))
                 )
+            case .deleteOpenCodeProfile(let profile):
+                return Alert(
+                    title: Text(L10n.tr("sidebar.deleteOpenCodeProfileTitle", value: "Delete OpenCode Profile?")),
+                    message: Text(L10n.format("sidebar.deleteOpenCodeProfileMessage", value: "“%@” will be deleted. This will not modify any OpenCode config files already written to disk.", profile.name.isEmpty ? L10n.tr("profile.defaultName", value: "Untitled Profile") : profile.name)),
+                    primaryButton: .destructive(Text(L10n.tr("profile.delete", value: "Delete"))) {
+                        _ = openCodeProfileViewModel.deleteProfile(id: profile.id)
+                    },
+                    secondaryButton: .cancel(Text(L10n.tr("profile.cancel", value: "Cancel")))
+                )
+            case .deleteQwenProfile(let profile):
+                return Alert(
+                    title: Text(L10n.tr("sidebar.deleteQwenProfileTitle", value: "Delete Qwen Profile?")),
+                    message: Text(L10n.format("sidebar.deleteQwenProfileMessage", value: "“%@” will be deleted. This will not modify any Qwen config files already written to disk.", profile.name.isEmpty ? L10n.tr("profile.defaultName", value: "Untitled Profile") : profile.name)),
+                    primaryButton: .destructive(Text(L10n.tr("profile.delete", value: "Delete"))) {
+                        _ = qwenProfileViewModel.deleteProfile(id: profile.id)
+                    },
+                    secondaryButton: .cancel(Text(L10n.tr("profile.cancel", value: "Cancel")))
+                )
             }
         }
         .onAppear {
@@ -108,6 +134,12 @@ struct SidebarView: View {
             syncExpandedSectionsWithSelection()
         }
         .onChange(of: claudeProfileViewModel.selectedProfileID) { _, _ in
+            syncExpandedSectionsWithSelection()
+        }
+        .onChange(of: openCodeProfileViewModel.selectedProfileID) { _, _ in
+            syncExpandedSectionsWithSelection()
+        }
+        .onChange(of: qwenProfileViewModel.selectedProfileID) { _, _ in
             syncExpandedSectionsWithSelection()
         }
         .onChange(of: appViewModel.agentCategories) { _, _ in
@@ -186,6 +218,16 @@ struct SidebarView: View {
 
                     if category.id == "codex" {
                         codexProfileSection
+                        sidebarSubheading(L10n.tr("sidebar.filesSection", value: "Files"))
+                    }
+
+                    if category.id == "opencode" {
+                        openCodeProfileSection
+                        sidebarSubheading(L10n.tr("sidebar.filesSection", value: "Files"))
+                    }
+
+                    if category.id == "qwen" {
+                        qwenProfileSection
                         sidebarSubheading(L10n.tr("sidebar.filesSection", value: "Files"))
                     }
 
@@ -274,6 +316,77 @@ struct SidebarView: View {
                         itemFrames[frameKeyForClaudeProfile(profile.id)] = frame
                     }
                     .simultaneousGesture(dragGestureForClaudeProfile(profile.id))
+            }
+        }
+    }
+
+    private var openCodeProfileSection: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            HStack {
+                sidebarSubheading(L10n.tr("sidebar.profilesSection", value: "Profiles"))
+                CountBadge(count: openCodeProfileViewModel.profiles.count)
+
+                Spacer()
+
+                Button {
+                    openCodeProfileViewModel.addProfile()
+                    codexProfileViewModel.clearSelection()
+                    claudeProfileViewModel.clearSelection()
+                    if appViewModel.selectedFile != nil {
+                        appViewModel.selectFile(nil)
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .bold))
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .help(L10n.tr("sidebar.newOpenCodeProfile", value: "New OpenCode Profile"))
+                .padding(.trailing, 4)
+            }
+
+            ForEach(openCodeProfileViewModel.profiles) { profile in
+                openCodeProfileRow(profile)
+                    .trackFrame(id: frameKeyForOpenCodeProfile(profile.id), in: CoordinateSpace.sidebar) { frame in
+                        itemFrames[frameKeyForOpenCodeProfile(profile.id)] = frame
+                    }
+                    .simultaneousGesture(dragGestureForOpenCodeProfile(profile.id))
+            }
+        }
+    }
+
+    private var qwenProfileSection: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            HStack {
+                sidebarSubheading(L10n.tr("sidebar.profilesSection", value: "Profiles"))
+                CountBadge(count: qwenProfileViewModel.profiles.count)
+
+                Spacer()
+
+                Button {
+                    qwenProfileViewModel.addProfile()
+                    codexProfileViewModel.clearSelection()
+                    claudeProfileViewModel.clearSelection()
+                    openCodeProfileViewModel.clearSelection()
+                    if appViewModel.selectedFile != nil {
+                        appViewModel.selectFile(nil)
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .bold))
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .help(L10n.tr("sidebar.newQwenProfile", value: "New Qwen Profile"))
+                .padding(.trailing, 4)
+            }
+
+            ForEach(qwenProfileViewModel.profiles) { profile in
+                qwenProfileRow(profile)
+                    .trackFrame(id: frameKeyForQwenProfile(profile.id), in: CoordinateSpace.sidebar) { frame in
+                        itemFrames[frameKeyForQwenProfile(profile.id)] = frame
+                    }
+                    .simultaneousGesture(dragGestureForQwenProfile(profile.id))
             }
         }
     }
@@ -417,11 +530,146 @@ struct SidebarView: View {
         }
     }
 
+    private func openCodeProfileRow(_ profile: OpenCodeProfile) -> some View {
+        let isDragging = activeOpenCodeProfileDragID == profile.id
+
+        return Button {
+            guard openCodeProfileViewModel.selectedProfileID != profile.id
+                    || appViewModel.selectedFile != nil
+                    || codexProfileViewModel.selectedProfileID != nil
+                    || claudeProfileViewModel.selectedProfileID != nil else { return }
+            navigate(to: .opencodeProfile(profile.id))
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "rectangle.stack")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    .frame(width: 18)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(profile.name.isEmpty ? L10n.tr("profile.defaultName", value: "Untitled Profile") : profile.name)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Text(openCodeProfileStatusText(profile, isOutOfSync: profile.isActive && openCodeProfileViewModel.isDiskOutOfSync))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 4)
+
+                Circle()
+                    .fill(openCodeProfileStateColor(profile, isOutOfSync: profile.isActive && openCodeProfileViewModel.isDiskOutOfSync))
+                    .frame(width: 8, height: 8)
+            }
+            .padding(.leading, 34)
+            .padding(.trailing, 10)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(RoundedRectangle(cornerRadius: 7))
+            .background(
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(openCodeProfileViewModel.selectedProfileID == profile.id ? Color.accentColor.opacity(0.16) : Color.clear)
+            )
+        }
+        .scaleEffect(isDragging ? 1.015 : 1)
+        .opacity(isDragging ? 0.74 : 1)
+        .shadow(color: .black.opacity(isDragging ? 0.12 : 0), radius: isDragging ? 10 : 0, y: isDragging ? 5 : 0)
+        .offset(y: isDragging ? -2 : 0)
+        .zIndex(isDragging ? 1 : 0)
+        .animation(sidebarDragLiftAnimation, value: isDragging)
+        .animation(sidebarReorderAnimation, value: openCodeProfileViewModel.profiles.map(\.id))
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button(L10n.tr("sidebar.duplicateProfile", value: "Duplicate Profile")) {
+                openCodeProfileViewModel.duplicateProfile(id: profile.id)
+            }
+
+            Divider()
+
+            Button(L10n.tr("sidebar.deleteProfile", value: "Delete Profile")) {
+                deleteTarget = .deleteOpenCodeProfile(profile)
+            }
+            .disabled(openCodeProfileViewModel.profiles.count <= 1)
+        }
+    }
+
+    private func qwenProfileRow(_ profile: QwenProfile) -> some View {
+        let isDragging = activeQwenProfileDragID == profile.id
+
+        return Button {
+            guard qwenProfileViewModel.selectedProfileID != profile.id
+                    || appViewModel.selectedFile != nil
+                    || codexProfileViewModel.selectedProfileID != nil
+                    || claudeProfileViewModel.selectedProfileID != nil
+                    || openCodeProfileViewModel.selectedProfileID != nil else { return }
+            navigate(to: .qwenProfile(profile.id))
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "rectangle.stack")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    .frame(width: 18)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(profile.name.isEmpty ? L10n.tr("profile.defaultName", value: "Untitled Profile") : profile.name)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Text(qwenProfileStatusText(profile, isOutOfSync: profile.isActive && qwenProfileViewModel.isDiskOutOfSync))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 4)
+
+                Circle()
+                    .fill(qwenProfileStateColor(profile, isOutOfSync: profile.isActive && qwenProfileViewModel.isDiskOutOfSync))
+                    .frame(width: 8, height: 8)
+            }
+            .padding(.leading, 34)
+            .padding(.trailing, 10)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(RoundedRectangle(cornerRadius: 7))
+            .background(
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(qwenProfileViewModel.selectedProfileID == profile.id ? Color.accentColor.opacity(0.16) : Color.clear)
+            )
+        }
+        .scaleEffect(isDragging ? 1.015 : 1)
+        .opacity(isDragging ? 0.74 : 1)
+        .shadow(color: .black.opacity(isDragging ? 0.12 : 0), radius: isDragging ? 10 : 0, y: isDragging ? 5 : 0)
+        .offset(y: isDragging ? -2 : 0)
+        .zIndex(isDragging ? 1 : 0)
+        .animation(sidebarDragLiftAnimation, value: isDragging)
+        .animation(sidebarReorderAnimation, value: qwenProfileViewModel.profiles.map(\.id))
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button(L10n.tr("sidebar.duplicateProfile", value: "Duplicate Profile")) {
+                qwenProfileViewModel.duplicateProfile(id: profile.id)
+            }
+
+            Divider()
+
+            Button(L10n.tr("sidebar.deleteProfile", value: "Delete Profile")) {
+                deleteTarget = .deleteQwenProfile(profile)
+            }
+            .disabled(qwenProfileViewModel.profiles.count <= 1)
+        }
+    }
+
     private func fileRow(_ file: ConfigFile) -> some View {
         Button {
             guard appViewModel.selectedFile?.url != file.url
                     || codexProfileViewModel.selectedProfileID != nil
-                    || claudeProfileViewModel.selectedProfileID != nil else { return }
+                    || claudeProfileViewModel.selectedProfileID != nil
+                    || openCodeProfileViewModel.selectedProfileID != nil
+                    || qwenProfileViewModel.selectedProfileID != nil else { return }
             navigate(to: .configFile(file))
         } label: {
             HStack(spacing: 10) {
@@ -517,6 +765,34 @@ struct SidebarView: View {
     }
 
     private func claudeProfileStateColor(_ profile: ClaudeProfile, isOutOfSync: Bool) -> Color {
+        if profile.isDirty { return .orange }
+        if profile.isActive && isOutOfSync { return .red }
+        if profile.isActive { return .green }
+        return Color(nsColor: .tertiaryLabelColor)
+    }
+
+    private func openCodeProfileStatusText(_ profile: OpenCodeProfile, isOutOfSync: Bool) -> String {
+        if profile.isDirty { return L10n.tr("profile.status.modified", value: "Unapplied Changes") }
+        if profile.isActive && isOutOfSync { return L10n.tr("profile.status.external", value: "External Changes") }
+        if profile.isActive { return L10n.tr("profile.status.active", value: "Active") }
+        return L10n.tr("profile.status.ready", value: "Ready to Apply")
+    }
+
+    private func openCodeProfileStateColor(_ profile: OpenCodeProfile, isOutOfSync: Bool) -> Color {
+        if profile.isDirty { return .orange }
+        if profile.isActive && isOutOfSync { return .red }
+        if profile.isActive { return .green }
+        return Color(nsColor: .tertiaryLabelColor)
+    }
+
+    private func qwenProfileStatusText(_ profile: QwenProfile, isOutOfSync: Bool) -> String {
+        if profile.isDirty { return L10n.tr("profile.status.modified", value: "Unapplied Changes") }
+        if profile.isActive && isOutOfSync { return L10n.tr("profile.status.external", value: "External Changes") }
+        if profile.isActive { return L10n.tr("profile.status.active", value: "Active") }
+        return L10n.tr("profile.status.ready", value: "Ready to Apply")
+    }
+
+    private func qwenProfileStateColor(_ profile: QwenProfile, isOutOfSync: Bool) -> Color {
         if profile.isDirty { return .orange }
         if profile.isActive && isOutOfSync { return .red }
         if profile.isActive { return .green }
@@ -634,6 +910,14 @@ struct SidebarView: View {
         "claude-profile:\(id.uuidString)"
     }
 
+    private func frameKeyForOpenCodeProfile(_ id: UUID) -> String {
+        "opencode-profile:\(id.uuidString)"
+    }
+
+    private func frameKeyForQwenProfile(_ id: UUID) -> String {
+        "qwen-profile:\(id.uuidString)"
+    }
+
     private func dragGestureForAgent(_ id: String) -> some Gesture {
         DragGesture(minimumDistance: 3, coordinateSpace: .named(CoordinateSpace.sidebar))
             .onChanged { value in
@@ -688,6 +972,42 @@ struct SidebarView: View {
             }
     }
 
+    private func dragGestureForOpenCodeProfile(_ id: UUID) -> some Gesture {
+        DragGesture(minimumDistance: 3, coordinateSpace: .named(CoordinateSpace.sidebar))
+            .onChanged { value in
+                if activeOpenCodeProfileDragID != id {
+                    withAnimation(sidebarDragLiftAnimation) {
+                        activeOpenCodeProfileDragID = id
+                    }
+                }
+                moveDraggedOpenCodeProfile(id, toY: value.location.y)
+            }
+            .onEnded { value in
+                moveDraggedOpenCodeProfile(id, toY: value.location.y)
+                withAnimation(sidebarDragLiftAnimation) {
+                    activeOpenCodeProfileDragID = nil
+                }
+            }
+    }
+
+    private func dragGestureForQwenProfile(_ id: UUID) -> some Gesture {
+        DragGesture(minimumDistance: 3, coordinateSpace: .named(CoordinateSpace.sidebar))
+            .onChanged { value in
+                if activeQwenProfileDragID != id {
+                    withAnimation(sidebarDragLiftAnimation) {
+                        activeQwenProfileDragID = id
+                    }
+                }
+                moveDraggedQwenProfile(id, toY: value.location.y)
+            }
+            .onEnded { value in
+                moveDraggedQwenProfile(id, toY: value.location.y)
+                withAnimation(sidebarDragLiftAnimation) {
+                    activeQwenProfileDragID = nil
+                }
+            }
+    }
+
     private func moveDraggedAgent(_ sourceID: String, toY y: CGFloat) {
         let orderedIDs = appViewModel.agentCategories.map(\.id)
         let destinationID = destinationAgentID(forY: y, sourceID: sourceID, orderedIDs: orderedIDs)
@@ -709,6 +1029,22 @@ struct SidebarView: View {
         let destinationID = destinationClaudeProfileID(forY: y, sourceID: sourceID, orderedIDs: orderedIDs)
         withAnimation(sidebarReorderAnimation) {
             claudeProfileViewModel.moveProfile(from: sourceID, to: destinationID)
+        }
+    }
+
+    private func moveDraggedOpenCodeProfile(_ sourceID: UUID, toY y: CGFloat) {
+        let orderedIDs = openCodeProfileViewModel.profiles.map(\.id)
+        let destinationID = destinationOpenCodeProfileID(forY: y, sourceID: sourceID, orderedIDs: orderedIDs)
+        withAnimation(sidebarReorderAnimation) {
+            openCodeProfileViewModel.moveProfile(from: sourceID, to: destinationID)
+        }
+    }
+
+    private func moveDraggedQwenProfile(_ sourceID: UUID, toY y: CGFloat) {
+        let orderedIDs = qwenProfileViewModel.profiles.map(\.id)
+        let destinationID = destinationQwenProfileID(forY: y, sourceID: sourceID, orderedIDs: orderedIDs)
+        withAnimation(sidebarReorderAnimation) {
+            qwenProfileViewModel.moveProfile(from: sourceID, to: destinationID)
         }
     }
 
@@ -736,6 +1072,24 @@ struct SidebarView: View {
             sourceID: sourceID,
             orderedIDs: orderedIDs,
             frameKey: frameKeyForClaudeProfile
+        )
+    }
+
+    private func destinationOpenCodeProfileID(forY y: CGFloat, sourceID: UUID, orderedIDs: [UUID]) -> UUID? {
+        destinationID(
+            forY: y,
+            sourceID: sourceID,
+            orderedIDs: orderedIDs,
+            frameKey: frameKeyForOpenCodeProfile
+        )
+    }
+
+    private func destinationQwenProfileID(forY y: CGFloat, sourceID: UUID, orderedIDs: [UUID]) -> UUID? {
+        destinationID(
+            forY: y,
+            sourceID: sourceID,
+            orderedIDs: orderedIDs,
+            frameKey: frameKeyForQwenProfile
         )
     }
 
@@ -830,6 +1184,16 @@ struct SidebarView: View {
 
         if claudeProfileViewModel.selectedProfileID != nil {
             expandCategory(.agent(id: "claude"))
+            return
+        }
+
+        if openCodeProfileViewModel.selectedProfileID != nil {
+            expandCategory(.agent(id: "opencode"))
+            return
+        }
+
+        if qwenProfileViewModel.selectedProfileID != nil {
+            expandCategory(.agent(id: "qwen"))
             return
         }
 

@@ -11,6 +11,8 @@ enum LastVisitedPage: Codable, Equatable {
     case configFile(path: String)
     case codexProfile(id: UUID)
     case claudeProfile(id: UUID)
+    case opencodeProfile(id: UUID)
+    case qwenProfile(id: UUID)
 
     private enum CodingKeys: String, CodingKey {
         case kind
@@ -22,6 +24,8 @@ enum LastVisitedPage: Codable, Equatable {
         case configFile
         case codexProfile
         case claudeProfile
+        case opencodeProfile
+        case qwenProfile
     }
 
     init(from decoder: Decoder) throws {
@@ -37,6 +41,12 @@ enum LastVisitedPage: Codable, Equatable {
         case .claudeProfile:
             let id = try container.decode(UUID.self, forKey: .profileID)
             self = .claudeProfile(id: id)
+        case .opencodeProfile:
+            let id = try container.decode(UUID.self, forKey: .profileID)
+            self = .opencodeProfile(id: id)
+        case .qwenProfile:
+            let id = try container.decode(UUID.self, forKey: .profileID)
+            self = .qwenProfile(id: id)
         }
     }
 
@@ -51,6 +61,12 @@ enum LastVisitedPage: Codable, Equatable {
             try container.encode(id, forKey: .profileID)
         case .claudeProfile(let id):
             try container.encode(Kind.claudeProfile, forKey: .kind)
+            try container.encode(id, forKey: .profileID)
+        case .opencodeProfile(let id):
+            try container.encode(Kind.opencodeProfile, forKey: .kind)
+            try container.encode(id, forKey: .profileID)
+        case .qwenProfile(let id):
+            try container.encode(Kind.qwenProfile, forKey: .kind)
             try container.encode(id, forKey: .profileID)
         }
     }

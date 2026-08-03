@@ -87,6 +87,8 @@ enum FileType: Equatable {
             return .toml
         case "sh", "zsh", "bash":
             return .shell
+        case "env":
+            return .shell
         default:
             break
         }
