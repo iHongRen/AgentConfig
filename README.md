@@ -4,20 +4,35 @@
 
 [English](./README_en.md)
 
-原生 macOS App，集中管理 Codex、Claude Code 等 AI 编程工具的配置文件和 API Key，支持多套配置快速切换。
+原生 macOS App，集中管理 Codex、Claude Code、OpenCode、Qwen Code 等 AI 编程工具的配置文件和 API Key，支持多套配置快速切换。
 
 ![](./screenshots/screenshot_cn.png)
 
 ## 功能
 
+- 支持 Codex、Claude Code、OpenCode、Qwen Code 四类 Agent Profile
 - 多账号 API Key 一键切换
 - Profile 独立分区管理
 - 可视化增删环境变量
 - 多格式语法高亮编辑
 - Cmd+F 搜索与格式化
 - 外部变更自动检测
+- `.zshrc` 托管块写入，不覆盖原有内容
+- 配置写入失败自动回滚
 - 侧边栏右键快捷操作
 - 拖拽文件快速收录
+
+## 支持的配置文件
+
+| Agent | 文件 |
+|-------|------|
+| **Codex** | `~/.codex/config.toml`、`~/.codex/auth.json` |
+| **Claude Code** | `~/.claude/settings.json`、`~/.claude.json` |
+| **OpenCode** | `~/.config/opencode/opencode.json`、`~/.local/share/opencode/auth.json` |
+| **Qwen Code** | `~/.qwen/settings.json`、`~/.qwen/settings.json.env` |
+| **环境变量** | `.zshrc`、`.zprofile`、`.bashrc`、`.bash_profile` 等 |
+
+OpenCode 扫描时同时兼容常见的 `opencode.jsonc` 路径，应用 Profile 时统一写入 `~/.config/opencode/opencode.json`。
 
 ## 安装
 

@@ -4,20 +4,35 @@
 
 [中文](./README.md)
 
-A native macOS app for managing Codex and Claude Code config files, API keys, and environment variables — with multi-profile switching.
+A native macOS app for managing Codex, Claude Code, OpenCode, and Qwen Code config files, API keys, and environment variables — with multi-profile switching.
 
 ![](./screenshots/screenshot_en.png)
 
 ## Features
 
+- Profile support for Codex, Claude Code, OpenCode, and Qwen Code
 - Multi-account API key switching
 - Isolated profile blocks
 - Visual env var management
 - Syntax highlighting editor
 - Search & format (Cmd+F)
 - External change detection
+- Managed `.zshrc` blocks without overwriting your existing shell config
+- Transactional config writes with rollback on failure
 - Sidebar quick actions
 - Drag & drop to add files
+
+## Supported Config Files
+
+| Agent | Files |
+|-------|-------|
+| **Codex** | `~/.codex/config.toml`, `~/.codex/auth.json` |
+| **Claude Code** | `~/.claude/settings.json`, `~/.claude.json` |
+| **OpenCode** | `~/.config/opencode/opencode.json`, `~/.local/share/opencode/auth.json` |
+| **Qwen Code** | `~/.qwen/settings.json`, `~/.qwen/settings.json.env` |
+| **Shell env** | `.zshrc`, `.zprofile`, `.bashrc`, `.bash_profile`, etc. |
+
+OpenCode scanning also recognizes common `opencode.jsonc` locations, while applying a profile writes to `~/.config/opencode/opencode.json`.
 
 ## Install
 

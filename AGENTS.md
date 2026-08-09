@@ -2,7 +2,7 @@
 
 # AgentConfig — Project-specific
 
-A native macOS app (SwiftUI + AppKit) for managing AI coding agent configuration files and agent profiles (Codex, Claude Code).
+A native macOS app (SwiftUI + AppKit) for managing AI coding agent configuration files and agent profiles (Codex, Claude Code, OpenCode, Qwen Code).
 
 ## Build
 
@@ -35,30 +35,34 @@ Views (SwiftUI + AppKit via NSViewRepresentable)
 
 ### Layout
 
-`NavigationSplitView` with two columns: sidebar (`SidebarView` + `FileListView`) and detail pane. The detail pane switches between `EditorView` (for config files), `CodexProfileEditorView`, and `ClaudeProfileEditorView` based on sidebar selection. Responsive: sidebar auto-collapses when window width < 760pt.
+`NavigationSplitView` with two columns: sidebar (`SidebarView` + `FileListView`) and detail pane. The detail pane switches between `EditorView` (for config files), `CodexProfileEditorView`, `ClaudeProfileEditorView`, `OpenCodeProfileEditorView`, and `QwenProfileEditorView` based on sidebar selection. Responsive: sidebar auto-collapses when window width < 760pt.
 
 ### Key components
 
-- **AgentConfigApp.swift** — `@main` entry point, `AppDelegate` (posts `appDidBecomeActive` for file-watcher refresh), `CommandCoordinator` (bridges editor callbacks to menu commands), `MainContentView`. Owns all `@StateObject` ViewModels: `AppViewModel`, `EditorViewModel`, `CodexProfileViewModel`, `ClaudeProfileViewModel`, `CommandCoordinator`.
+- **AgentConfigApp.swift** — `@main` entry point, `AppDelegate` (posts `appDidBecomeActive` for file-watcher refresh), `CommandCoordinator` (bridges editor callbacks to menu commands), `MainContentView`. Owns all `@StateObject` ViewModels: `AppViewModel`, `EditorViewModel`, `CodexProfileViewModel`, `ClaudeProfileViewModel`, `OpenCodeProfileViewModel`, `QwenProfileViewModel`, `CommandCoordinator`.
 - **ContentView.swift** — Placeholder view (not used in main flow).
 - **AppViewModel** — central coordinator: owns AgentScanner, FileService, AppSettings. Handles file selection, custom paths, hide/show files. Defines `CategorySelection` enum (`.agent` / `.env`).
 - **EditorViewModel** — file editing (load/save/undo/redo/search/JSON format), external change detection, source runner for shell files. Content is a `@Published` two-way binding to the NSTextView.
 - **CodexProfileViewModel** — manages Codex profile selection, editing, persistence, and applying profiles to disk.
 - **ClaudeProfileViewModel** — manages Claude Code profile selection, editing, persistence, and applying profiles to disk. Mirrors `CodexProfileViewModel` structure.
-- **SidebarView** — shows environment files, known agent files, custom-added files, missing files, plus profile subsections under Codex and Claude Code agents.
+- **OpenCodeProfileViewModel** — manages OpenCode profile selection, editing, persistence, and applying profiles to disk. Mirrors `CodexProfileViewModel` structure.
+- **QwenProfileViewModel** — manages Qwen Code profile selection, editing, persistence, and applying profiles to disk. Mirrors `CodexProfileViewModel` structure.
+- **SidebarView** — shows environment files, known agent files, custom-added files, missing files, plus profile subsections under Codex, Claude Code, OpenCode, and Qwen Code agents.
 - **FileListView** — middle column within the sidebar area; lists files for the selected category with creation buttons for missing files and unsaved-change indicators.
 - **EditorView / CodeEditorView** — `NSTextView` wrapped via `NSViewRepresentable`. Syntax highlighting via `SyntaxHighlighter` (`NSTextStorageDelegate`, regex-based). Comment toggle via `CommentingTextView` (Cmd+/ for `#`, `//`, `%` prefixes based on `FileType`).
 - **EditorToolbarView** — top toolbar showing filename (with unsaved indicator), JSON format button, and inline format-error location.
 - **SearchBarView** — VSCode-style search bar with keyword highlighting, prev/next navigation, and case-sensitivity toggle.
-- **AgentProfileEditorView** — generic, reusable profile editor driven by `AgentProfileEditorProfile` / `AgentProfileEditorField` value types. Used by both `CodexProfileEditorView` and `ClaudeProfileEditorView`.
+- **AgentProfileEditorView** — generic, reusable profile editor driven by `AgentProfileEditorProfile` / `AgentProfileEditorField` value types. Used by `CodexProfileEditorView`, `ClaudeProfileEditorView`, `OpenCodeProfileEditorView`, and `QwenProfileEditorView`.
 - **AgentProfileCodeEditor** — resizable code editor cards for `AgentProfileEditorView`, with drag-to-resize handles and height persistence.
 - **CodexProfileEditorView** — adapts `AgentProfileEditorView` for Codex profiles (config TOML, auth JSON, zshrc exports).
 - **ClaudeProfileEditorView** — adapts `AgentProfileEditorView` for Claude Code profiles (settings JSON, claude.json, zshrc exports).
+- **OpenCodeProfileEditorView** — adapts `AgentProfileEditorView` for OpenCode profiles (`opencode.json`, `auth.json`, zshrc exports).
+- **QwenProfileEditorView** — adapts `AgentProfileEditorView` for Qwen Code profiles (`settings.json`, `settings.json.env`, optional zshrc exports).
 - **ProfileFieldHelpButton** — small `?` button that shows a popover with field help text.
 - **CommentingTextView** — `NSTextView` subclass handling Cmd+/ comment toggling, dispatching to `FileType.lineCommentPrefix`.
 - **SettingsView** — appearance (light/dark/system) and language (en/zh-Hans/system) settings.
 - **AboutView** — app info, version, build number, author credits.
-- **AgentScanner** — scans `~` for known agent config files using definitions from `AgentDefinitions` (2 enabled: Claude Code, Codex; 3 commented-out: Gemini CLI, OpenCode CLI, Qwen Code).
+- **AgentScanner** — scans `~` for known agent config files using definitions from `AgentDefinitions` (4 enabled: Claude Code, Codex, OpenCode, Qwen Code; Gemini CLI remains commented out). `AgentConfigEntry` supports multiple candidate paths for one logical config file, which is used for OpenCode JSON/JSONC detection.
 - **FileWatcher** — `DispatchSourceFileSystemObject` with 500ms debounce for external change detection.
 - **AppSettings** — `UserDefaults` wrapper for appearance, language, customPaths, hiddenFiles, and per-category added file paths.
 - **AppError** — `LocalizedError` enum: `fileReadFailed`, `fileWriteFailed`, `jsonFormatError`.
@@ -76,6 +80,8 @@ Each service is defined as a protocol + implementation:
 | `FileWatcherProtocol` | `FileWatcher` | Watch open files for external changes |
 | `CodexProfileServiceProtocol` | `CodexProfileService` | Persist and apply Codex profiles (`~/.codex/config.toml`, `~/.codex/auth.json`, managed `.zshrc` block). Writes are transactional with rollback on failure. |
 | `ClaudeProfileServiceProtocol` | `ClaudeProfileService` | Persist and apply Claude Code profiles (`~/.claude/settings.json`, deep-merge `.claude.json` into disk copy, managed `.zshrc` block). Writes are transactional with rollback on failure. |
+| `OpenCodeProfileServiceProtocol` | `OpenCodeProfileService` | Persist and apply OpenCode profiles (`~/.config/opencode/opencode.json`, `~/.local/share/opencode/auth.json`, managed `.zshrc` block). Writes are transactional with rollback on failure. |
+| `QwenProfileServiceProtocol` | `QwenProfileService` | Persist and apply Qwen Code profiles (`~/.qwen/settings.json`, `~/.qwen/settings.json.env`, optional managed `.zshrc` block). Writes are transactional with rollback on failure. |
 
 ### Data flow
 
@@ -84,11 +90,12 @@ Each service is defined as a protocol + implementation:
 3. Cmd+S → `EditorViewModel.save()` → `FileService.write()`
 4. User selects a Codex profile → `CodexProfileViewModel.selectedProfile` changes → detail pane shows `CodexProfileEditorView`
 5. User selects a Claude profile → `ClaudeProfileViewModel.selectedProfile` changes → detail pane shows `ClaudeProfileEditorView`
-6. User applies profile → `CodexProfileService.apply(profile:)` writes agent config and managed `.zshrc` block; `ClaudeProfileService.apply(profile:)` writes `settings.json`, deep-merges `.claude.json` with disk, and updates managed `.zshrc` block
+6. User selects an OpenCode or Qwen profile → the matching ViewModel selection changes → detail pane shows `OpenCodeProfileEditorView` or `QwenProfileEditorView`
+7. User applies profile → `CodexProfileService.apply(profile:)` writes agent config and managed `.zshrc` block; `ClaudeProfileService.apply(profile:)` writes `settings.json`, deep-merges `.claude.json` with disk, and updates managed `.zshrc` block; `OpenCodeProfileService.apply(profile:)` writes `opencode.json`, `auth.json`, and the managed `.zshrc` block; `QwenProfileService.apply(profile:)` writes `settings.json`, `settings.json.env`, and the optional managed `.zshrc` block
 
 ### Adding a new agent
 
-1. In `AgentDefinitions.swift`, uncomment the existing agent definition (Gemini CLI, OpenCode CLI, Qwen Code are already defined but commented out) or add a new `AgentDefinition` to the `allAgents` array
+1. In `AgentDefinitions.swift`, add a new `AgentDefinition` to `AgentDefinitions.all` (Gemini CLI already exists there as a commented template)
 2. Add icon image to `Assets.xcassets`
 3. Update i18n strings for both en and zh-Hans if user-facing copy is added
 
