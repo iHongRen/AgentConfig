@@ -8,6 +8,19 @@
 
 ![](./screenshots/screenshot_cn.png)
 
+
+## 安装
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/iHongRen/AgentConfig/main/install.sh | sh
+```
+
+或从 [GitHub Releases](https://github.com/iHongRen/AgentConfig/releases) 下载 `AgentConfig.dmg`。如遇安全提示：
+
+```sh
+xattr -dr com.apple.quarantine /Applications/AgentConfig.app
+```
+
 ## 功能
 
 - 支持 Codex、Claude Code、OpenCode、Qwen Code 四类 Agent Profile
@@ -34,17 +47,6 @@
 
 OpenCode 扫描时同时兼容常见的 `opencode.jsonc` 路径，应用 Profile 时统一写入 `~/.config/opencode/opencode.json`。
 
-## 安装
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/iHongRen/AgentConfig/main/install.sh | sh
-```
-
-或从 [GitHub Releases](https://github.com/iHongRen/AgentConfig/releases) 下载 `AgentConfig.dmg`。如遇安全提示：
-
-```sh
-xattr -dr com.apple.quarantine /Applications/AgentConfig.app
-```
 
 ## 安全
 

@@ -8,6 +8,18 @@ A native macOS app for managing Codex, Claude Code, OpenCode, and Qwen Code conf
 
 ![](./screenshots/screenshot_en.png)
 
+## Install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/iHongRen/AgentConfig/main/install.sh | sh
+```
+
+Or download `AgentConfig.dmg` from [GitHub Releases](https://github.com/iHongRen/AgentConfig/releases). If blocked by macOS Gatekeeper:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/AgentConfig.app
+```
+
 ## Features
 
 - Profile support for Codex, Claude Code, OpenCode, and Qwen Code
@@ -34,17 +46,7 @@ A native macOS app for managing Codex, Claude Code, OpenCode, and Qwen Code conf
 
 OpenCode scanning also recognizes common `opencode.jsonc` locations, while applying a profile writes to `~/.config/opencode/opencode.json`.
 
-## Install
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/iHongRen/AgentConfig/main/install.sh | sh
-```
-
-Or download `AgentConfig.dmg` from [GitHub Releases](https://github.com/iHongRen/AgentConfig/releases). If blocked by macOS Gatekeeper:
-
-```sh
-xattr -dr com.apple.quarantine /Applications/AgentConfig.app
-```
 
 ## Security
 
